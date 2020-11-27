@@ -6,14 +6,12 @@ import time
 import copy
 import os
 import sys
-sys.path.append('..')
-from scipy.io import loadmat
 from sklearn.preprocessing import OneHotEncoder
 import matplotlib.pyplot as plt
 from util.Graph_manager import Graph_manager
 from util.activelearner import *
 from util.gbssl import *
-from experiment_util import *
+from util.experiment_util import *
 
 
 ## Define hyperparameters of the runs
