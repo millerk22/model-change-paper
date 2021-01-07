@@ -70,7 +70,6 @@ class GraphManager(object):
         w, v = self.compute_spectrum(L, n_eigs=n_eigs)
         L = sps.csr_matrix(L)
         self.W = W
-        self.L = L
         if debug:
             return w, v
 
@@ -82,6 +81,8 @@ class GraphManager(object):
             mlflow.log_params(params)
             mlflow.log_artifact('./tmp/eigs.npz')
             mlflow.log_artifact('./tmp/W.npz')
+            os.remove('./tmp/eigs.npz')
+            os.remove('./tmp/W.npz')
             return w, v
 
     def compute_similarity_graph(self, X, knn=15, sigma=3., zp_k=None, metric='euclidean', maxN=5000):

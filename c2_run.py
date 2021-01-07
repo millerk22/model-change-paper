@@ -9,7 +9,7 @@ import os
 import math
 import sys
 import matplotlib.pyplot as plt
-from util.Graph_manager import GraphManager
+from util.graph_manager import GraphManager
 from util.runs_util import *
 
 import mlflow
@@ -205,4 +205,3 @@ if __name__ == "__main__":
             os.remove('tmp/init_labeled.npy')
         if os.path.exists('tmp/iter_stats.npz'):
             os.remove('tmp/iter_stats.npz')
-    
