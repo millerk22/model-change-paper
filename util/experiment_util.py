@@ -6,6 +6,8 @@ from sklearn.preprocessing import OneHotEncoder
 sys.path.append('..')
 from util.activelearner import *
 from util.gbssl import *
+import matplotlib.pyplot as plt
+import pickle
 
 
 BMODELNAMES = ['gr', 'log', 'probitnorm']
@@ -248,3 +250,79 @@ def get_avg_acc_from_runs_dict(RUNS, runs=[1]):
         return
     accs = np.array(accs)
     return np.average(accs, axis=0), np.std(accs, axis=0)
+
+
+
+
+
+'''
+'''
+
+def run_experiment_rkhs_hf(oracle, init_labeled, num_al_iters, B_per_al_iter, modelname='rkhs', X=None, L=None,
+                          cand='rand', select_method='top', root_filename='./', acquisition='db',
+                          run=-1, verbose=False, tau=0.1, gamma=0.1):
+    '''
+    Inputs:
+      X = dataset
+      oracle = "labels" ground truth numpy array, in {0, 1, ..., n_c} or {-1, 1}
+      init_labeled = list of indices that are initially labeled, per ordering in oracle and rows of v
+      num_al_iters = total number of active learning iterations to perform
+      B_per_al_iter = batch size B that will be done on each iteration
+
+    Outputs:
+      labeled : list of indices of labeled points chosen throughout whole active learning process
+      acc : list of length (num_al_iters + 1) corresponding to the accuracies of the current classifer at each AL iteration
+    '''
+
+    if run == -1:
+        raise ValueError("Need to include which run this is. Make sure you know which initially labeled set corresponds to this run")
+    parent_filename = root_filename + "%s-%s-%d-%s-%s/" % ('db', 'rkhs', X.shape[0], str(tau), str(gamma))
+    if not os.path.exists(parent_filename):
+        os.makedirs(parent_filename)
+
+    experiment_name = parent_filename + "%s-%s-%d-%d-%d.txt" % (cand, select_method, B_per_al_iter, num_al_iters, run)
+
+    if -1 not in np.unique(oracle):
+        oracle[oracle == 0] = -1
+
+    if modelname == 'rkhs':
+        assert X is not None
+        model = RKHSClassifier(X, sigma=0.1) # bandwidth from Karzand paper
+    else:
+        assert L is not None
+        model = HFGraphBasedSSLModel(tau, L)
+    # train the initial model, record accuracy
+    model.calculate_model(labeled=init_labeled[:], y=list(oracle[init_labeled]))
+    acc = get_acc(model.f, oracle, unlabeled=model.unlabeled)[1]
+
+
+    # write initial line of file
+    f = open(experiment_name, 'w')
+    f.write(','.join(str(n) for n in init_labeled) + ',--,%1.6f\n' % acc )
+
+    # instantiate ActiveLearner object
+    print("ActiveLearner Settings:\n\tRKHS Data-Based Norm")
+    print("\tselect_method = %s, B = %d" % (select_method, B_per_al_iter))
+    AL = ActiveLearner(acquisition=acquisition, candidate=cand)
+
+    for al_iter in range(num_al_iters):
+        if verbose or (al_iter % 10 == 0):
+            print("AL Iteration %d, acc=%1.6f" % (al_iter + 1, acc))
+
+        # select query points via active learning
+        tic = time.perf_counter()
+        Q = AL.select_query_points(
+            model, B_per_al_iter, method=select_method, verbose=verbose, debug=True)
+        toc = time.perf_counter()
+
+        # query oracle
+        yQ = list(oracle[Q])
+
+        # update model, and calculate updated model's accuracy
+        model.update_model(Q, yQ)
+        acc = get_acc(model.f, oracle, unlabeled=model.unlabeled)[1]
+        f.write(','.join(str(n) for n in Q) + ',%f,%1.6f\n' %((toc - tic), acc))
+
+
+    f.close()
+    return

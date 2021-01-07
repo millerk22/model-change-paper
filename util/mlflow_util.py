@@ -8,7 +8,7 @@ def get_prev_run(function, params, tags=None, git_commit=None):
     query += ' and tags."function" = "{}"'.format(function)
     for key, val in params.items():
         query += ' and '
-        query += 'params.{} = "{}"'.format(key, val) 
+        query += 'params.{} = "{}"'.format(key, val)
     if tags:
         for key, val in tags.items():
             query += ' and '

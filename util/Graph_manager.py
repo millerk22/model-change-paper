@@ -59,7 +59,7 @@ class Graph_manager(object):
         """
         pass
 
-    # Only for Data_obj
+
     def from_features(self, X, params, debug=False):
         """
         load from features using params
@@ -100,10 +100,12 @@ class Graph_manager(object):
 
         with mlflow.start_run(nested=True):
             np.savez('./eigs.npz', w=w, v=v)
+            sps.save_npz('./W.npz', W)
             mlflow.set_tag('function', 'Graph_manager.from_features')
             mlflow.set_tag('X', str(X))
             mlflow.log_params(params)
             mlflow.log_artifact('./eigs.npz')
+            mlflow.log_artifact('./W.npz')
             return w, v
 
     def sqdist(self, X, Y):

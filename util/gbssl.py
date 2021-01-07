@@ -3,7 +3,7 @@ Graph Based SSL model class
 '''
 from .al_util import *
 
-VALID_MODELS = ['gr', 'probit-log', 'probit-norm', 'log', 'probitnorm']
+VALID_MODELS = ['gr', 'probit-log', 'probit-norm', 'log', 'probitnorm', 'mgr']
 
 class BinaryGraphBasedSSLModel(object):
     '''
@@ -26,8 +26,8 @@ class BinaryGraphBasedSSLModel(object):
         else:
             self.trunc = False
         self.w = w
-        self.d = (self.tau ** (-2.)) * ((self.w + self.tau**2.))
-        #self.d = self.w + self.tau**2.
+        #self.d = (self.tau ** (-2.)) * ((self.w + self.tau**2.))
+        self.d = self.w + self.tau**2.
         if Ct is not None:
             self.Ct = Ct
         else:
@@ -158,7 +158,7 @@ class BinaryGraphBasedSSLModelReduced(object):
         return
 
     def calculate_model(self, labeled, y):
-        if self.modelname == 'gr':
+        if self.modelname in ['gr', 'mgr']:
             self.C_a = sp.linalg.inv(np.diag(self.d) + self.v[labeled,:].T @ self.v[labeled,:] / (self.gamma**2.))
             self.alpha = self.C_a @ self.v[labeled,:].T @ np.array(y) / (self.gamma**2.)
         else:
@@ -185,7 +185,7 @@ class BinaryGraphBasedSSLModelReduced(object):
                 C_a_vk = self.C_a @ self.v[k,:]
                 ip = np.inner(self.v[k,:], C_a_vk)
                 mk = np.inner(self.v[k,:], self.alpha.T)
-                if self.modelname == 'gr':
+                if self.modelname in ['gr', 'mgr']:
                     if self.nc > 2:
                         self.alpha += np.outer(C_a_vk, (yk - mk)/(self.gamma**2 + ip))
                     else:
@@ -227,7 +227,7 @@ class BinaryGraphBasedSSLModelReduced(object):
             return probit_map_st_alpha(Z, y,  self.gamma, self.d, self.v)
         elif self.modelname == "probit-log" or self.modelname == 'log':
             return probit_map_st2_alpha(Z, y,  self.gamma, self.d, self.v)
-        elif self.modelname == "gr":
+        elif self.modelname in ["gr", "mgr"]:
             vZ = self.v[Z, :]
             C_a = np.diag(self.d) + vZ.T @ vZ / (self.gamma**2.)
             return (1. / self.gamma**2.)* sp.linalg.inv(C_a) @ vZ.T @ np.array(y)
@@ -242,7 +242,7 @@ class BinaryGraphBasedSSLModelReduced(object):
             return Hess_inv_st_alpha(self.alpha, y, 1./self.d, self.v[Z,:], self.gamma)
         elif self.modelname == "probit-log" or self.modelname == 'log':
             return Hess_inv_st2_alpha(self.alpha, y, 1./self.d, self.v[Z,:], self.gamma)
-        elif self.modelname == "gr":
+        elif self.modelname in ["gr", "mgr"]:
             vZ = self.v[Z, :]
             C_a = np.diag(self.d) + vZ.T @ vZ / (self.gamma**2.)
             return sp.linalg.inv(C_a)
@@ -251,191 +251,7 @@ class BinaryGraphBasedSSLModelReduced(object):
 
 
 
-
-class MultiGraphBasedSSLModel(object):
-    ''' ***** Only Gaussian Regression Currently Implemented ********
-    Implements full storage of C_tau, C.
-        * Can have truncated eigenvalues and eigenvectors
-
-
-    Get rid of storing eigenvectors and eigenvalues?? (Since we're already committing to storing C_tau and C fully)
-    '''
-    def __init__(self, modelname, gamma, tau, v=None, w=None, Ct=None):
-        if modelname == 'gr':
-            print("The multiclass GR has been put into the BinaryGraphBasedSSLModel...")
-        self.gamma = gamma
-        self.tau = tau
-        if v is None:
-            raise ValueError("Need to provide the eigenvectors in the variable 'v'")
-        if w is None:
-            raise ValueError("Need to provide the eigenvalues in the variable 'w'")
-        self.v = v
-        if self.v.shape[0] != self.v.shape[1]:
-            self.trunc = True
-        else:
-            self.trunc = False
-        self.w = w
-        self.d = (self.tau ** (-2.)) * ((self.w + self.tau**2.))
-        #self.d = self.w + self.tau**2.
-        if Ct is not None:
-            self.Ct = Ct
-        else:
-            self.Ct = (self.v * (1./self.d)) @ self.v.T
-        if modelname not in VALID_MODELS:
-            raise ValueError("%s is not a valid modelname, must be in %s" % (modelname, str(VALID_MODELS)))
-        self.modelname = modelname
-        self.full_storage = True
-        self.m = None
-        self.C = None
-        return
-
-    def calculate_model(self, labeled, y):
-        if self.modelname == 'gr':
-            C_a = sp.linalg.inv(np.diag(self.d) + self.v[labeled,:].T @ self.v[labeled,:] / (self.gamma**2.))
-            self.C = self.v @ C_a @ self.v.T
-            self.m = (self.C[:,labeled] @ np.array(y))/(self.gamma**2.)
-        else:
-            raise NotImplementedError("Only Gaussian Regression is implemented.")
-            # self.m = self.get_m(labeled, y)
-            # self.C = self.get_C(labeled, y, self.m)
-        self.labeled = labeled
-        self.y = y
-        self.unlabeled = list(filter(lambda x: x not in self.labeled, range(self.C.shape[0])))
-        return
-
-    def update_model(self, Q, yQ, exact=False):
-        if self.m is None or self.C is None:
-            print("Previous model not defined, so assuming you are passing in initial labeled set and labelings...")
-            self.calculate_model(Q, yQ)
-            return
-        if not exact:
-            print("... Updating model with NA updates ...")
-            if self.modelname == 'gr':
-                for k,yk in zip(Q, yQ): # done
-                    self.m += np.outer(self.C[:, k],(yk - self.m[k,:])/(self.gamma**2 + self.C[k,k]))
-                    self.C -= np.outer(self.C[:,k], self.C[:,k])/(self.gamma**2. + self.C[k,k])
-                self.unlabeled.remove(k)
-            else:
-                raise ValueError("model name %s not recognized or implemented" % str(self.modelname))
-            self.labeled += list(Q)
-            self.y = np.concatenate((self.y, yQ))
-        else:
-            print("... Updating model with EXACT updates ...")
-            self.labeled += list(Q)
-            self.y = np.concatenate((self.y, yQ))
-            self.calculate_model(self.labeled, self.y)
-
-        return
-
-    # def get_m(self, Z, y):
-    #     if self.modelname == "gr":
-    #         return gr_map(Z, y, self.gamma, self.d, self.v)
-    #     else:
-    #         raise ValueError("did not recognize modelname = %s" % self.modelname)
-    #
-    # def get_C(self, Z, y, m):
-    #     if self.modelname == "gr":
-    #         return gr_C(Z, self.gamma, self.d, self.v)
-    #     else:
-    #         raise ValueError("did not recognize modelname = %s" % self.modelname)
-
-
-
-
-
-class MultiGraphBasedSSLModelReduced(object):
-    '''
-    *********** Only Gaussian Regression Currently implemented ************
-
-    '''
-    def __init__(self, modelname, gamma, tau, v=None, w=None):
-        if modelname == 'gr':
-            print("The multiclass GR has been put into the BinaryGraphBasedSSLModel...")
-        self.gamma = gamma
-        self.tau = tau
-        if v is None:
-            raise ValueError("Need to provide the eigenvectors in the variable 'v'")
-        if w is None:
-            raise ValueError("Need to provide the eigenvalues in the variable 'w'")
-        self.v = v
-        self.trunc = True
-        if self.v.shape[0] == self.v.shape[1]:
-            print("Warning : It appears that you've given the full spectrum, this class is not optimized for that case...")
-        self.w = w
-        self.d = (self.tau ** (-2.)) * ((self.w + self.tau**2.))
-        #self.d = self.w + self.tau**2.
-        if modelname not in VALID_MODELS:
-            raise ValueError("%s is not a valid modelname, must be in %s" % (modelname, str(VALID_MODELS)))
-        self.full_storage = False
-        self.modelname = modelname
-        self.m = None
-        self.alpha = None
-        self.C_a = None
-        return
-
-    def calculate_model(self, labeled, y):
-        if self.modelname == 'gr':
-            self.C_a = sp.linalg.inv(np.diag(self.d) + self.v[labeled,:].T @ self.v[labeled,:] / (self.gamma**2.))
-            self.alpha = self.C_a @ self.v[labeled,:].T @ np.array(y)/(self.gamma**2.)
-        else:
-            raise NotImplementedError("Only Gaussian Regression is implemented.")
-            # self.alpha = self.get_alpha(labeled, y)
-            # self.C_a = self.get_C_alpha(labeled, y)
-        self.m = self.v @ self.alpha
-        self.labeled = labeled
-        self.y = np.array(y)
-        self.unlabeled = list(filter(lambda x: x not in self.labeled, range(self.v.shape[0])))
-        return
-
-    def update_model(self, Q, yQ, exact=False):
-        if self.alpha is None or self.C_a is None:
-            print("Previous model not defined, so assuming you are passing in initial labeled set and labelings...")
-            self.calculate_model(Q, yQ)
-            return
-        if not exact:
-            for k, yk in zip(Q, yQ):
-                C_a_vk = self.C_a @ self.v[k,:]
-                ip = np.inner(self.v[k,:], C_a_vk)
-                mk = np.inner(self.v[k,:], self.alpha.T)
-                if self.modelname == 'gr':
-                    self.alpha += np.outer(C_a_vk, (yk - mk)/(self.gamma**2 + ip))
-                    self.C_a -= np.outer(C_a_vk, C_a_vk)/(self.gamma**2. + ip)
-                else:
-                    raise ValueError("model name %s not recognized or implemented" % str(model))
-                self.unlabeled.remove(k)
-            self.m = self.v @ self.alpha
-            self.labeled += list(Q)
-            self.y = np.concatenate((self.y, yQ))
-        else:
-            print("---- Updating model EXACTLY ----")
-            self.labeled += list(Q)
-            self.y = np.concatenate((self.y, yQ))
-            self.calculate_model(self.labeled, self.y)
-
-        return
-
-    # def get_alpha(self, Z, y):
-    #     '''
-    #     '''
-    #     if self.modelname == "gr":
-    #         vZ = self.v[Z, :]
-    #         C_a = np.diag(self.d) + vZ.T @ vZ / (self.gamma**2.)
-    #         return (1. / self.gamma**2.)* sp.linalg.inv(C_a) @ vZ.T @ np.array(y)
-    #     else:
-    #         pass
-    #
-    # def get_C_alpha(self, Z, y):
-    #     '''
-    #     '''
-    #     if self.modelname == "gr":
-    #         vZ = self.v[Z, :]
-    #         C_a = np.diag(self.d) + vZ.T @ vZ / (self.gamma**2.)
-    #         return sp.linalg.inv(C_a)
-    #     else:
-    #         pass
-
-
-class SoftmaxGraphBasedSSLModelReduced(object):
+class CrossEntropyGraphBasedSSLModelReduced(object):
     '''
     Softmax model implementation is only available in the reduced case.
     '''
@@ -455,7 +271,7 @@ class SoftmaxGraphBasedSSLModelReduced(object):
         self.d = (self.tau ** (-2.)) * ((self.w + self.tau**2.))
         #self.d = self.w + self.tau**2.
         self.full_storage = False
-        self.modelname = "softmax"
+        self.modelname = "ce"
         self.m = None
         self.alpha = None
         self.C_a = None
@@ -478,28 +294,8 @@ class SoftmaxGraphBasedSSLModelReduced(object):
             return
         if not exact:
             raise NotImplementedError("Have not implemented inexact NA updates for this model yet")
-            # for k, yk in zip(Q, yQ):
-            #     C_a_vk = self.C_a @ (self.v[k,:].T)
-            #     ip = np.inner(self.v[k,:], C_a_vk)
-            #     mk = np.inner(self.v[k,:], self.alpha)
-            #     if self.modelname == 'gr':
-            #         self.alpha += (yk - mk)/(self.gamma**2 + ip) * C_a_vk
-            #         self.C_a -= np.outer(C_a_vk, C_a_vk)/(self.gamma**2. + ip)
-            #     elif self.modelname == 'probit-log' or self.modelname == 'log':
-            #         self.alpha -= jac_calc2(mk, yk, self.gamma) / (1. + ip * hess_calc2(mk, yk, self.gamma))*C_a_vk
-            #         mk = np.inner(self.v[k,:], self.alpha)
-            #         self.C_a -= hess_calc2(mk, yk, self.gamma)/(1. + ip * hess_calc2(mk, yk, self.gamma))*np.outer(C_a_vk, C_a_vk)
-            #     elif self.modelname == 'probit-norm' or self.modelname == 'probitnorm':
-            #         self.alpha -= jac_calc(mk, yk, self.gamma) / (1. + ip * hess_calc(mk, yk, self.gamma))*C_a_vk
-            #         mk = np.inner(self.v[k,:], self.alpha)
-            #         self.C_a -= hess_calc(mk, yk, self.gamma)/(1. + ip * hess_calc(mk, yk, self.gamma))*np.outer(C_a_vk, C_a_vk)
-            #     else:
-            #         raise ValueError("model name %s not recognized or implemented" % str(model))
-            # self.m = self.v @ self.alpha
-            # self.labeled += list(Q)
-            # self.y += list(yQ)
         else:
-            #print("-- Updating Softmax model Exactly --")
+            #print("-- Updating CE model Exactly --")
             self.labeled += list(Q)
             self.y = np.concatenate((self.y, yQ))
             self.calculate_model(self.labeled, self.y)
@@ -618,3 +414,82 @@ def probit_map_st_alpha(Z, y,  gamma, w, v):
     res = root(f, x0, jac=fprime)
     #print(f"Root Finding is successful: {res.success}")
     return res.x
+
+
+
+
+
+
+class HFGraphBasedSSLModel(object):
+    ''' We implement the ''full'' HF model only for comparisons.
+
+    '''
+    def __init__(self, delta, L):
+        self.modelname = 'hf'
+        self.full_storage = True
+        self.N = L.shape[0]
+        self.L = L + delta**2. * sps.eye(self.N)
+        self.f = None
+        self.C = None
+        return
+
+    def calculate_model(self, labeled, y):
+        self.labeled = labeled
+        self.unlabeled = list(filter(lambda x: x not in self.labeled, range(self.N)))
+        #print(len(self.unlabeled), len(self.labeled))
+        self.C = np.linalg.inv(self.L[np.ix_(self.unlabeled, self.unlabeled)].A)
+        if isinstance(y, list):
+            self.nc = 2
+            self.f = np.zeros(self.N)
+        else:
+            self.nc = y.shape[1]
+            self.f = np.zeros((self.N, self.nc))
+        self.y = y
+        self.f[self.labeled] = np.array(y)
+        self.f[self.unlabeled] = -self.C @ self.L[np.ix_(self.unlabeled, self.labeled)] @ np.array(y)
+
+        return
+
+    def update_model(self, Q, yQ, exact=False):
+        if self.f is None or self.C is None:
+            print("Previous model not defined, so assuming you are passing in initial labeled set and labelings...")
+            self.calculate_model(Q, yQ)
+            return
+        # kis = []
+        # for k, yk in zip(Q, yQ):
+        #     ki = self.unlabeled.index(k)
+        #     kis.append(ki)
+        #     self.f[self.unlabeled] += (yk - self.f[k])/(self.C[ki,ki]) * self.C[ki,:]
+        #     self.C -= np.outer(self.C[ki,:], self.C[ki,:])/self.C[ki,ki]
+        # unlQ = list(filter(lambda x: x not in kis, range(len(self.unlabeled))))
+        # for k, yk in zip(Q,yQ):
+        #     self.unlabeled.remove(k)
+        #     self.f[k] = yk
+        # self.C = self.C[np.ix_(unlQ, unlQ)]
+
+        self.labeled += list(Q)
+        if self.nc > 2:
+            self.y = np.concatenate((self.y, yQ))
+        else:
+            self.y += list(yQ)
+
+        Qi = [self.unlabeled.index(k) for k in Q]
+        unlQi = list(filter(lambda x: x not in Qi, range(len(self.unlabeled))))
+        CQ_inv = np.linalg.inv(self.C[np.ix_(Qi, Qi)])
+        self.C = self.C[np.ix_(unlQi, unlQi)] - self.C[np.ix_(unlQi, Qi)] @ CQ_inv @ self.C[np.ix_(Qi, unlQi)]
+        self.f[Q] = np.array(yQ)
+        for k in Q:
+            self.unlabeled.remove(k)
+
+        self.f[self.unlabeled] = -self.C @ self.L[np.ix_(self.unlabeled, self.labeled)] @ np.array(self.y)
+
+
+        return
+
+    def vopt_vals(self, Cand):
+        unl_Cand = [self.unlabeled.index(k) for k in Cand]
+        return np.linalg.norm(self.C[:, unl_Cand], axis=0) / self.C[unl_Cand, unl_Cand]
+
+    def sopt_vals(self, Cand):
+        unl_Cand = [self.unlabeled.index(k) for k in Cand]
+        return np.sum(self.C[:, unl_Cand], axis=0)/ self.C[unl_Cand, unl_Cand]

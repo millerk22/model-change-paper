@@ -6,9 +6,10 @@ import numpy as np
 from .dijkstra import *
 from .al_util import *
 from .acquisitions import *
+from .rkhs import *
 
 
-ACQUISITIONS = ['mc', 'uncertainty', 'rand', 'vopt', 'sopt', 'mbr', 'mcgreedy']
+ACQUISITIONS = ['mc', 'uncertainty', 'rand', 'vopt', 'sopt', 'mbr', 'mcgreedy', 'db']
 # MODELS = ['gr', 'probit-log', 'probit-norm', 'softmax', 'log', 'probitnorm']
 CANDIDATES = ['rand', 'full', 'dijkstra']
 SELECTION_METHODS = ['top', 'prop', '']
@@ -22,79 +23,90 @@ def sgn(x):
 def acquisition_values(acq, Cand, model):
     if acq == "mc":
         if model.full_storage:
-            vals = mc_full(Cand, model.m, model.C, model.modelname, gamma=model.gamma)
+            return mc_full(Cand, model.m, model.C, model.modelname, gamma=model.gamma)
         else:
-            vals = mc_reduced(model.C_a, model.alpha, model.v[Cand,:], model.modelname, uks=model.m[Cand], gamma=model.gamma)
+            return mc_reduced(model.C_a, model.alpha, model.v[Cand,:], model.modelname, uks=model.m[Cand], gamma=model.gamma)
     elif acq == "mcgreedy":
-        vals = mc_reduced(model.C_a, model.alpha, model.v[Cand,:], model.modelname, uks=model.m[Cand], gamma=model.gamma, greedy=True)
+        return mc_reduced(model.C_a, model.alpha, model.v[Cand,:], model.modelname, uks=model.m[Cand], gamma=model.gamma, greedy=True)
     elif acq == "uncertainty":
         if len(model.m.shape) > 1: # entropy calculation
             #print('multi unc')
             probs = np.exp(model.m[Cand])
             probs /= np.sum(probs, axis=1)[:, np.newaxis]
-            vals = -np.sum(probs*np.log(probs), axis=1)
+            return -np.sum(probs*np.log(probs), axis=1)
         else:
-            vals = -np.absolute(model.m[Cand])  # ensuring a "max" formulation for acquisition values
+            return -np.absolute(model.m[Cand])  # ensuring a "max" formulation for acquisition values
     elif acq == "rand":
-        vals = np.random.rand(len(Cand))
+        return np.random.rand(len(Cand))
     elif acq == "vopt":
-        if model.full_storage:
-            ips = np.array([np.inner(model.C[k,:], model.C[k,:]) for k in Cand]).flatten()
-            if model.modelname == "gr":
-                return ips/(model.gamma**2. + np.diag(model.C)[Cand])
-            if model.modelname == "probit-norm":
-                return ips * np.array([hess_calc(model.m[k], sgn(model.m[k]), model.gamma)/ \
-                        (hess_calc(model.m[k], sgn(model.m[k]), model.gamma)*model.C[k,k] + 1.) for k in Cand])
-            if model.modelname == "probit-log":
-                return ips * np.array([hess_calc2(model.m[k], sgn(model.m[k]), model.gamma)/ \
-                        (hess_calc2(model.m[k], sgn(model.m[k]), model.gamma)*model.C[k,k] + 1.) for k in Cand])
+        if model.modelname == 'hf':
+            return model.vopt_vals(Cand)
         else:
-            uks = model.m[Cand]
-            C_a_vk = model.C_a @ (model.v[Cand,:].T)
-            ips = np.array([np.inner(C_a_vk[:,i],C_a_vk[:,i]) for i in range(len(Cand))])
-            if model.modelname == 'gr':
-                return ips / (model.gamma**2. + np.array([np.inner(model.v[Cand[i],:], C_a_vk[:,i]) for i in range(len(Cand))]))
+            if model.full_storage:
+                ips = np.array([np.inner(model.C[k,:], model.C[k,:]) for k in Cand]).flatten()
+                if model.modelname in ["gr", "mgr"]:
+                    return ips/(model.gamma**2. + np.diag(model.C)[Cand])
+                if model.modelname == "probit-norm":
+                    return ips * np.array([hess_calc(model.m[k], sgn(model.m[k]), model.gamma)/ \
+                            (hess_calc(model.m[k], sgn(model.m[k]), model.gamma)*model.C[k,k] + 1.) for k in Cand])
+                if model.modelname == "probit-log":
+                    return ips * np.array([hess_calc2(model.m[k], sgn(model.m[k]), model.gamma)/ \
+                            (hess_calc2(model.m[k], sgn(model.m[k]), model.gamma)*model.C[k,k] + 1.) for k in Cand])
+            else:
+                uks = model.m[Cand]
+                C_a_vk = model.C_a @ (model.v[Cand,:].T)
+                ips = np.array([np.inner(C_a_vk[:,i],C_a_vk[:,i]) for i in range(len(Cand))])
+                if model.modelname in ["gr", "mgr"]:
+                    return ips / (model.gamma**2. + np.array([np.inner(model.v[Cand[i],:], C_a_vk[:,i]) for i in range(len(Cand))]))
 
-            if model.modelname == 'probit-log' or modelname == 'log':
-                return ips * np.array([hess_calc2(model.m[k], sgn(model.m[k]), model.gamma)/ \
-                        (hess_calc2(model.m[k], sgn(model.m[k]), model.gamma)*np.inner(model.v[Cand,:][i,:], C_a_vk[:,i]) + 1.) for i,k in enumerate(Cand)])
+                if model.modelname == 'probit-log' or model.modelname == 'log':
+                    return ips * np.array([hess_calc2(model.m[k], sgn(model.m[k]), model.gamma)/ \
+                            (hess_calc2(model.m[k], sgn(model.m[k]), model.gamma)*np.inner(model.v[Cand,:][i,:], C_a_vk[:,i]) + 1.) for i,k in enumerate(Cand)])
 
-            if model.modelname == 'probit-norm' or modelname == 'probitnorm':
-                return ips * np.array([hess_calc(model.m[k], sgn(model.m[k]), model.gamma)/ \
-                        (hess_calc(model.m[k], sgn(model.m[k]), model.gamma)*np.inner(model.v[Cand,:][i,:], C_a_vk[:,i]) + 1.) for i,k in enumerate(Cand)])
+                if model.modelname == 'probit-norm' or model.modelname == 'probitnorm':
+                    return ips * np.array([hess_calc(model.m[k], sgn(model.m[k]), model.gamma)/ \
+                            (hess_calc(model.m[k], sgn(model.m[k]), model.gamma)*np.inner(model.v[Cand,:][i,:], C_a_vk[:,i]) + 1.) for i,k in enumerate(Cand)])
 
     elif acq == "sopt":
-        if model.full_storage:
-            sums = np.sum(model.C[Cand,:], axis=1).flatten()**2.
-            if model.modelname == "gr":
-                return sums/(model.gamma**2. + np.diag(model.C)[Cand])
-            if model.modelname == "probit-norm":
-                return sums * np.array([hess_calc(model.m[k], sgn(model.m[k]), model.gamma)/ \
-                        (hess_calc(model.m[k], sgn(model.m[k]), model.gamma)*model.C[k,k] + 1.) for k in Cand])
-            if model.modelname == "probit-log":
-                return sums * np.array([hess_calc2(model.m[k], sgn(model.m[k]), model.gamma)/ \
-                        (hess_calc2(model.m[k], sgn(model.m[k]), model.gamma)*model.C[k,k] + 1.) for k in Cand])
+        if model.modelname == 'hf':
+            return model.sopt_vals(Cand)
         else:
-            uks = model.m[Cand]
-            C_a_vk = model.C_a @ (model.v[Cand,:].T)
-            VTones = np.sum(model.v, axis=0).flatten()
-            tops = np.array([np.inner(VTones, C_a_vk[:,i]) for i in range(len(Cand))])**2.
-            if model.modelname == 'gr':
-                return tops / (model.gamma**2. + np.array([np.inner(model.v[Cand[i],:], C_a_vk[:,i]) for i in range(len(Cand))]))
+            if model.full_storage:
+                sums = np.sum(model.C[Cand,:], axis=1).flatten()**2.
+                if model.modelname in ["gr", "mgr"]:
+                    return sums/(model.gamma**2. + np.diag(model.C)[Cand])
+                if model.modelname == "probit-norm":
+                    return sums * np.array([hess_calc(model.m[k], sgn(model.m[k]), model.gamma)/ \
+                            (hess_calc(model.m[k], sgn(model.m[k]), model.gamma)*model.C[k,k] + 1.) for k in Cand])
+                if model.modelname == "probit-log":
+                    return sums * np.array([hess_calc2(model.m[k], sgn(model.m[k]), model.gamma)/ \
+                            (hess_calc2(model.m[k], sgn(model.m[k]), model.gamma)*model.C[k,k] + 1.) for k in Cand])
+            else:
+                uks = model.m[Cand]
+                C_a_vk = model.C_a @ (model.v[Cand,:].T)
+                VTones = np.sum(model.v, axis=0).flatten()
+                tops = np.array([np.inner(VTones, C_a_vk[:,i]) for i in range(len(Cand))])**2.
+                if model.modelname in ['gr', 'mgr']:
+                    return tops / (model.gamma**2. + np.array([np.inner(model.v[Cand[i],:], C_a_vk[:,i]) for i in range(len(Cand))]))
 
-            if model.modelname == 'probit-log' or modelname == 'log':
-                return tops * np.array([hess_calc2(model.m[k], sgn(model.m[k]), model.gamma)/ \
-                        (hess_calc2(model.m[k], sgn(model.m[k]), model.gamma)*np.inner(model.v[Cand,:][i,:], C_a_vk[:,i]) + 1.) for i,k in enumerate(Cand)])
+                if model.modelname == 'probit-log' or model.modelname == 'log':
+                    return tops * np.array([hess_calc2(model.m[k], sgn(model.m[k]), model.gamma)/ \
+                            (hess_calc2(model.m[k], sgn(model.m[k]), model.gamma)*np.inner(model.v[Cand,:][i,:], C_a_vk[:,i]) + 1.) for i,k in enumerate(Cand)])
 
-            if model.modelname == 'probit-norm' or modelname == 'probitnorm':
-                return tops * np.array([hess_calc(model.m[k], sgn(model.m[k]), model.gamma)/ \
-                        (hess_calc(model.m[k], sgn(model.m[k]), model.gamma)*np.inner(model.v[Cand,:][i,:], C_a_vk[:,i]) + 1.) for i,k in enumerate(Cand)])
+                if model.modelname == 'probit-norm' or model.modelname == 'probitnorm':
+                    return tops * np.array([hess_calc(model.m[k], sgn(model.m[k]), model.gamma)/ \
+                            (hess_calc(model.m[k], sgn(model.m[k]), model.gamma)*np.inner(model.v[Cand,:][i,:], C_a_vk[:,i]) + 1.) for i,k in enumerate(Cand)])
     elif acq == "mbr":
         raise NotImplementedError()
+    elif acq == "db":
+        if model.modelname != 'rkhs':
+            raise NotImplementedError("Databased norm is for RKHS model only")
+        else:
+            return model.look_ahead_db_norms(Cand)
     else:
         raise ValueError("Acquisition function %s not yet implemented" % str(acq))
 
-    return vals
+    return
 
 
 

@@ -5,7 +5,7 @@ from scipy.stats import norm
 from util.al_util import *
 import time
 
-MODELS = ['gr', 'probit-log', 'probit-norm', 'softmax', 'log', 'probitnorm']
+MODELS = ['gr', 'probit-log', 'probit-norm', 'ce', 'log', 'probitnorm', 'mgr']
 
 def sgn(x):
     if x >= 0:
@@ -41,7 +41,7 @@ def mc_reduced(C_a, alpha, v_Cand, modelname, uks=None, gamma=0.1, verbose=False
     if modelname not in MODELS:
         raise ValueError("%s is not a valid model name, must be in %s" % (modelname, MODELS))
 
-    if modelname == 'softmax':
+    if modelname == 'ce':
         num_cand, M = v_Cand.shape
         nc = alpha.shape[0]//M
 
