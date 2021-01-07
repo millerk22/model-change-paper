@@ -9,7 +9,7 @@ import os
 import math
 import sys
 import matplotlib.pyplot as plt
-from util.Graph_manager_updated import GraphManager
+from util.Graph_manager import GraphManager
 from util.runs_util import *
 
 import mlflow
