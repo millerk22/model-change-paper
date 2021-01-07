@@ -146,8 +146,8 @@ class BinaryGraphBasedSSLModelReduced(object):
         if self.v.shape[0] == self.v.shape[1]:
             print("Warning : It appears that you've given the full spectrum, this class is not optimized for that case...")
         self.w = w
-        self.d = (self.tau ** (-2.)) * ((self.w + self.tau**2.))
-        #self.d = self.w + self.tau**2.
+        #self.d = (self.tau ** (-2.)) * ((self.w + self.tau**2.))
+        self.d = self.w + self.tau**2.
         if modelname not in VALID_MODELS:
             raise ValueError("%s is not a valid modelname, must be in %s" % (modelname, str(VALID_MODELS)))
         self.full_storage = False
@@ -268,8 +268,8 @@ class CrossEntropyGraphBasedSSLModelReduced(object):
         if self.v.shape[0] == self.v.shape[1]:
             print("Warning : It appears that you've given the full spectrum, this class is not optimized for that case...")
         self.w = w
-        self.d = (self.tau ** (-2.)) * ((self.w + self.tau**2.))
-        #self.d = self.w + self.tau**2.
+        #self.d = (self.tau ** (-2.)) * ((self.w + self.tau**2.))
+        self.d = self.w + self.tau**2.
         self.full_storage = False
         self.modelname = "ce"
         self.m = None

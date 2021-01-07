@@ -153,6 +153,7 @@ class RKHSClassifier(object):
         self.f = None
         self.K = np.exp(-cdist(X, X)/self.sigma) # calculate full, dense kernel matrix upfront
         self.modelname = 'rkhs'
+        self.nc = 2
 
     def calculate_model(self, labeled, y):
         self.labeled = labeled

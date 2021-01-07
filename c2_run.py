@@ -9,7 +9,7 @@ import os
 import math
 import sys
 import matplotlib.pyplot as plt
-from util.Graph_manager import Graph_manager
+from util.Graph_manager import GraphManager
 from util.runs_util import *
 
 import mlflow
@@ -18,7 +18,15 @@ from util.mlflow_util import *
 
 ACQ_MODELS = ['vopt--gr', 'sopt--gr', 'sopt--hf', 'mc--probitnorm', 'rand--gr', \
         'rand--log', 'rand--probitnorm', 'mc--gr', 'mc--probitnorm', 'vopt--hf',
-        'db--rkhs']
+        'uncertainty--gr', 'uncertainty--log', 'uncertainty--probitnorm', 'db--rkhs']
+
+GRAPH_PARAMS = {
+    'knn' :10,
+    'sigma' : 3.,
+    'normalized' : True,
+    'zp_k' : 5
+}
+
 
 def create_checkerboard2(N):
     X = np.random.rand(N,2)
@@ -60,8 +68,13 @@ if __name__ == "__main__":
     parser.add_argument('--select_method', default='top', type=str, help='how to select which points to query from the acquisition values. in ["top", "prop"]')
     parser.add_argument('--runs', default=5, type=int, help='Number of trials to run')
     parser.add_argument('--lab-start', default=2, dest='lab_start', type=int, help='Number of initially labeled points.')
+    parser.add_argument('--metric', default='euclidean', type=str, help='metric name ("euclidean" or "cosine") for graph construction')
+    parser.add_argument('--name', default='checker2', dest='experiment_name', help='Name for this dataset/experiment run ')
     args = parser.parse_args()
 
+
+    GRAPH_PARAMS['n_eigs'] = args.M
+    GRAPH_PARAMS['metric'] = args.metric
 
     if not os.path.exists('tmp/'):
         os.makedirs('tmp/')
@@ -84,22 +97,16 @@ if __name__ == "__main__":
 
 
     # Load in or calculate eigenvectors, using mlflow IN Graph_manager
-    gm = Graph_manager()
-    graph_params = {
-        'knn' :10,
-        'sigma' : 3.,
-        'Ltype' : 'normed',
-        'n_eigs' : args.M,
-        'zp_k' : 5
-    }
-
-    evals, evecs = gm.from_features(X, graph_params) # runs mlflow logging in this function call
+    gm = GraphManager()
+    evals, evecs = gm.from_features(X, knn=GRAPH_PARAMS['knn'], sigma=GRAPH_PARAMS['sigma'],
+                        normalized=GRAPH_PARAMS['normalized'], n_eigs=GRAPH_PARAMS['n_eigs'],
+                        zp_k=GRAPH_PARAMS['zp_k'], metric=GRAPH_PARAMS['metric']) # runs mlflow logging in this function call
 
     # If we are doing a run with the HF model, we need the unnormalized graph Laplacian
     L = None
     if 'hf' in ''.join(ACQ_MODELS):
-        prev_run = get_prev_run('Graph_manager.from_features',
-                                graph_params,
+        prev_run = get_prev_run('GraphManager.from_features',
+                                GRAPH_PARAMS,
                                 tags={"X":str(X)},
                                 git_commit=None)
 
@@ -107,7 +114,7 @@ if __name__ == "__main__":
                         'W.npz'))
         path = urllib.parse.unquote(url_data.path)
         W = sps.load_npz(path)
-        L = sps.csr_matrix(gm.compute_laplacian(W, Ltype='unnormalized')) + args.delta**2. * sps.eye(N)
+        L = sps.csr_matrix(gm.compute_laplacian(W, normalized=False)) + args.delta**2. * sps.eye(N)
 
 
     # Run the experiments
@@ -148,13 +155,16 @@ if __name__ == "__main__":
             for key, val in params_shared.items():
                 query += ' and params.{} = "{}"'.format(key, val)
 
-            #print(query)
-            already_completed = [run.data.tags['mlflow.runName'] for run in client.search_runs([experiment.experiment_id], filter_string=query)]
-            #print([run.data.tags['mlflow.runName'] for run in client.search_runs([experiment.experiment_id], filter_string=query)])
 
-            print("Run {} already completed:".format(i))
-            for thing in sorted(already_completed, key= lambda x : x[0]):
-                print("\t", thing)
+            already_completed = [run.data.tags['mlflow.runName'] for run in client.search_runs([experiment.experiment_id], filter_string=query)]
+
+
+            if len(already_completed) > 0:
+                print("Run {} already completed:".format(i))
+                for thing in sorted(already_completed, key= lambda x : x[0]):
+                    print("\t", thing)
+                print()
+
             np.save('tmp/init_labeled', init_labeled)
 
             for acq, model in (am.split('--') for am in ACQ_MODELS):
@@ -181,7 +191,6 @@ if __name__ == "__main__":
                             run_binary(evals, evecs, args.tau, args.gamma, labels, labeled, args.al_iters, args.B,
                                             modelname=model, acq=acq, cand=args.cand, select_method=args.select_method, verbose=False)
                         else:
-
                             if model == 'hf':
                                 mlflow.log_param('delta', args.delta)
                             else:
@@ -196,3 +205,4 @@ if __name__ == "__main__":
             os.remove('tmp/init_labeled.npy')
         if os.path.exists('tmp/iter_stats.npz'):
             os.remove('tmp/iter_stats.npz')
+    

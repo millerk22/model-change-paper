@@ -16,9 +16,9 @@ import mlflow
 from util.mlflow_util import *
 
 
+# These are acq-model pairs available for a multiclass problem
 ACQ_MODELS = ['vopt--mgr', 'sopt--mgr', 'sopt--hf', 'mc--mgr', 'mcgreedy--ce', 'mc--ce', \
-        'rand--ce', 'rand--mgr', 'vopt--hf']
-
+        'rand--ce', 'rand--mgr', 'vopt--hf', 'uncertainty--mgr', 'uncertainty--ce']
 
 EXPERIMENT_NAME = 'dataset'
 
@@ -79,6 +79,7 @@ if __name__ == "__main__":
                         normalized=GRAPH_PARAMS['normalized'], n_eigs=GRAPH_PARAMS['n_eigs'],
                         zp_k=GRAPH_PARAMS['zp_k'], metric=GRAPH_PARAMS['metric']) # runs mlflow logging in this function call
 
+    L = None
     # If we are doing a run with the HF model, we need the unnormalized graph Laplacian
     if 'hf' in ''.join(ACQ_MODELS):
         print("Since HF model include in ACQ_MODELS, calculating (or finding) the full graph laplacian L...")
