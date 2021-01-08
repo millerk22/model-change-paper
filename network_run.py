@@ -19,52 +19,18 @@ from util.mlflow_util import *
 ACQ_MODELS = ['vopt--mgr', 'sopt--mgr', 'sopt--hf', 'mc--mgr', 'mcgreedy--ce', 'mc--ce', \
         'rand--ce', 'rand--mgr', 'vopt--hf', 'uncertainty--mgr', 'uncertainty--ce']
 
-GRAPH_PARAMS = {
-    'knn' :10,
-    'sigma' : 3.,
-    'normalized' : True,
-    'zp_k' : 5
-}
-
-experiment_name = 'checker3'
-N = 3000
-
-def create_checkerboard3(N):
-    X = np.random.rand(N,2)
-    labels = []
-    for x in X:
-        i, j = 0,0
-        if 0.33333 <= x[0] and x[0] < 0.66666:
-            i = 1
-        elif 0.66666 <= x[0]:
-            i = 2
-
-        if 0.33333 <= x[1] and x[1] < 0.66666:
-            j = 1
-        elif 0.66666 <= x[1]:
-            j = 2
-
-        labels.append(3*j + i)
-    labels = np.array(labels)
-    labels[labels == 4] = 0
-    labels[labels == 8] = 0
-    labels[labels == 5] = 1
-    labels[labels == 6] = 1
-    labels[labels == 3] = 2
-    labels[labels == 7] = 2
-    return X, labels
 
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description = 'Run Active Learning experiment on Checkerboard 3 dataset')
-    parser.add_argument('--data_root', default='./data/checker3/', type=str, help='Location of data X with labels.')
+    parser = argparse.ArgumentParser(description = 'Run Active Learning experiment on Network datasets, defaults to PubMed (named pubmed)')
+    parser.add_argument('--data_root', default='./data/pubmed/', type=str, help='Location of data X with labels (X_labels.npz), eigendata(eig.npz) and weight matrix W (W.npz).')
     parser.add_argument('--num_eigs', default=50, dest='M', type=int, help='Number of eigenvalues for spectral truncation')
     parser.add_argument('--tau-gr', default=0.01, dest='tau_gr', type=float, help='value of diagonal perturbation and scaling of MGR (not HF)')
     parser.add_argument('--gamma-gr', default=0.1, dest='gamma_gr', type=float, help='value of noise parameter of MGR (not HF)')
     parser.add_argument('--tau-ce', default=0.01, dest='tau_ce', type=float, help='value of diagonal perturbation and scaling of CE model')
     parser.add_argument('--gamma-ce', default=0.1, dest='gamma_ce', type=float, help='value of noise parameter of CE model')
-    parser.add_argument('--delta', default=0.1, type=float, help='value of diagonal perturbation of unnormalized graph Laplacian for HF model.')
+    parser.add_argument('--delta', default=0.01, type=float, help='value of diagonal perturbation of unnormalized graph Laplacian for HF model.')
     parser.add_argument('--B', default=5, type=int, help='batch size for AL iterations')
     parser.add_argument('--al_iters', default=11, type=int, help='number of active learning iterations to perform.')
     parser.add_argument('--candidate-method', default='rand', type=str, dest='cand', help='candidate set selection method name ["rand", "full"]')
@@ -72,53 +38,43 @@ if __name__ == "__main__":
     parser.add_argument('--select_method', default='top', type=str, help='how to select which points to query from the acquisition values. in ["top", "prop"]')
     parser.add_argument('--lab-start', default=3, type=int, dest='lab_start', help='size of initially labeled set.')
     parser.add_argument('--runs', default=5, type=int, help='Number of trials to run')
-    parser.add_argument('--metric', default='euclidean', type=str, help='metric name ("euclidean" or "cosine") for graph construction')
-    parser.add_argument('--name', default='checker3', dest='experiment_name', help='Name for this dataset/experiment run ')
+    parser.add_argument('--name', default='pubmed', dest='experiment_name', help='Name for this dataset/experiment run ')
     args = parser.parse_args()
 
-    GRAPH_PARAMS['n_eigs'] = args.M
-    GRAPH_PARAMS['metric'] = args.metric
+
+    print("data_root is {} and experiment name is {} --------".format(args.data_root, args.experiment_name))
 
 
     if not os.path.exists('tmp/'):
         os.makedirs('tmp/')
 
-    # Load in or Create the Dataset
+    # Load in the Network Dataset
     if not os.path.exists(args.data_root + 'X_labels.npz'):
-        print("Cannot find previously saved data at {}".format(args.data_root + 'X_labels.npz'))
-        print("so creating the dataset and labels")
+        raise ValueError("Cannot find previously saved data at {}".format(args.data_root + 'X_labels.npz'))
 
-        X, labels = create_checkerboard3(N)
-        os.makedirs(args.data_root)
-        np.savez(args.data_root + 'X_labels.npz', X=X, labels=labels)
-    else:
+    print("Loading data at {}".format(args.data_root + 'X_labels.npz'))
+    data = np.load(args.data_root + 'X_labels.npz', allow_pickle=True)
+    labels = data['labels']
+    N = labels.shape[0]
 
-        data = np.load(args.data_root + 'X_labels.npz')
-        X, labels = data['X'], data['labels']
-        N = X.shape[0]
-
+    if args.lab_start < len(np.unique(labels)):
+        print("Number of initial points specified ({}) not enough to at least represent each class ({}), increasing the number of initially labeled points...".format(args.lab_start, len(np.unique(labels))))
+        args.lab_start = len(np.unique(labels))
 
 
+    if not os.path.exists(args.data_root + 'eig.npz'):
+        raise ValueError("Cannot find previously saved data at {}".format(args.data_root + 'eig.npz'))
 
-    # Load in or calculate eigenvectors, using mlflow IN Graph_manager
-    gm = GraphManager()
-
-    evals, evecs = gm.from_features(X, knn=GRAPH_PARAMS['knn'], sigma=GRAPH_PARAMS['sigma'],
-                        normalized=GRAPH_PARAMS['normalized'], n_eigs=GRAPH_PARAMS['n_eigs'],
-                        zp_k=GRAPH_PARAMS['zp_k'], metric=GRAPH_PARAMS['metric']) # runs mlflow logging in this function call
+    print("Loading graph data at {}".format(args.data_root + 'eig.npz'))
+    eig_data = np.load(args.data_root + 'eig.npz', allow_pickle=True)
+    evals, evecs = eig_data['evals'], eig_data['evecs']
+    evals, evecs = evals[:args.M], evecs[:,:args.M]
 
     # If we are doing a run with the HF model, we need the unnormalized graph Laplacian
     L = None
     if 'hf' in ''.join(ACQ_MODELS):
-        prev_run = get_prev_run('GraphManager.from_features',
-                                graph_params,
-                                tags={"X":str(X)},
-                                git_commit=None)
-
-        url_data = urllib.parse.urlparse(os.path.join(prev_run.info.artifact_uri,
-                        'W.npz'))
-        path = urllib.parse.unquote(url_data.path)
-        W = sps.load_npz(path)
+        W = sps.load_npz(args.data_root + 'W.npz')
+        gm = GraphManager()
         L = sps.csr_matrix(gm.compute_laplacian(W, normalized=False)) + args.delta**2. * sps.eye(N)
 
 
@@ -140,9 +96,15 @@ if __name__ == "__main__":
     else:
 
         client = mlflow.tracking.MlflowClient()
+        mlflow.set_experiment(args.experiment_name)
+        experiment = client.get_experiment_by_name(args.experiment_name)
+        if experiment is not None:
+            print("Looks like you've already run this experiment name previously... Are you sure you want to continue? [y/n]")
+            ans = input()
+            if ans not in ['y', 'yes']:
+                raise ValueError("Exited test")
 
-        mlflow.set_experiment(experiment_name)
-        experiment = client.get_experiment_by_name(experiment_name)
+
 
         for i, seed in enumerate(j**2 + 3 for j in range(args.runs)):
             np.random.seed(seed)

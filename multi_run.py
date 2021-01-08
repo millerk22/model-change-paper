@@ -40,7 +40,7 @@ if __name__ == "__main__":
     parser.add_argument('--tau-gr', default=0.01, dest='tau_gr', type=float, help='value of diagonal perturbation and scaling of MGR (not HF)')
     parser.add_argument('--gamma-gr', default=0.1, dest='gamma_gr', type=float, help='value of noise parameter of MGR (not HF)')
     parser.add_argument('--tau-ce', default=0.01, dest='tau_ce', type=float, help='value of diagonal perturbation and scaling of CE model')
-    parser.add_argument('--gamma-ce', default=0.01, dest='gamma_ce', type=float, help='value of noise parameter of CE model')
+    parser.add_argument('--gamma-ce', default=0.1, dest='gamma_ce', type=float, help='value of noise parameter of CE model')
     parser.add_argument('--delta', default=0.01, type=float, help='value of diagonal perturbation of unnormalized graph Laplacian for HF model.')
     parser.add_argument('--B', default=5, type=int, help='batch size for AL iterations')
     parser.add_argument('--al_iters', default=11, type=int, help='number of active learning iterations to perform.')

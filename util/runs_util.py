@@ -130,6 +130,7 @@ def run_rkhs_hf(oracle, init_labeled, num_al_iters, B_per_al_iter, modelname='rk
     else:
         assert L is not None
         model = HFGraphBasedSSLModel(delta, L)
+
     # train the initial model, record accuracy
     if len(np.unique(oracle)) > 2:
         # calculate one-hot labels for oracle
@@ -218,7 +219,7 @@ def run_multi(w, v, tau, gamma, oracle, init_labeled, num_al_iters, B_per_al_ite
     if acq not in ACQS:
         raise ValueError(
             "acq = %s is not a valid acquisition function currently implemented:\n\t%s" % (acq, str(ACQS)))
-
+    
     N, M = v.shape
     if M < N:
         truncated = True

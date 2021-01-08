@@ -1,5 +1,5 @@
 '''
-Graph Based SSL model class
+Graph Based SSL model class file -- CLEAN UP BinaryGraphBasedSSLModelReduced class
 '''
 from .al_util import *
 
@@ -250,6 +250,69 @@ class BinaryGraphBasedSSLModelReduced(object):
             pass
 
 
+##################################################################################
+################### Helper Functions for Reduced Model ###########################
+##################################################################################
+
+
+def Hess_inv_st2_alpha(alpha, y, d, v_Z, gamma):
+    '''
+    This method keeps everything in the "alpha"-space, of dimension num_eig x num_eig
+    '''
+    Dprime = sp.sparse.diags([1./hess_calc2(np.inner(v_Z[i,:],alpha), yi, gamma) for i, yi in enumerate(y)], format='csr')
+    A = d[:, np.newaxis] * ((v_Z.T @ sp.linalg.inv(Dprime + v_Z @ (d[:, np.newaxis] * (v_Z.T))) @ v_Z) * d)
+    return np.diag(d) - A
+
+
+def Hess_inv_st_alpha(alpha, y, d, v_Z, gamma):
+    '''
+    This method keeps everything in the "alpha"-space, of dimension num_eig x num_eig
+    '''
+    Dprime = sp.sparse.diags([1./hess_calc(np.inner(v_Z[i,:],alpha), yi, gamma) for i, yi in enumerate(y)], format='csr')
+    A = d[:, np.newaxis] * ((v_Z.T @ sp.linalg.inv(Dprime + v_Z @ (d[:, np.newaxis] * (v_Z.T))) @ v_Z) * d)
+    return np.diag(d) - A
+
+def probit_map_st2_alpha(Z, y,  gamma, w, v):
+    n,l = v.shape[1], len(y)
+    def f(x):
+        vec = np.zeros(l)
+        for j, (i,yi) in enumerate(zip(Z,y)):
+            vec[j] = - jac_calc2(np.inner(v[i,:], x), yi, gamma)
+        return w * x  - v[Z,:].T @ vec
+    def fprime(x):
+        vec = np.zeros(l)
+        for j, (i,yi) in enumerate(zip(Z, y)):
+            vec[j] = -hess_calc2(np.inner(v[i,:], x), yi, gamma)
+
+        H = (-v[Z,:].T * vec) @ v[Z,:]
+        H[np.diag_indices(n)] += w
+        return H
+    x0 = np.random.rand(len(w))
+    res = root(f, x0, jac=fprime)
+    #print(f"Root Finding is successful: {res.success}")
+    return res.x
+
+def probit_map_st_alpha(Z, y,  gamma, w, v):
+    n,l = v.shape[1], len(y)
+    def f(x):
+        vec = np.zeros(l)
+        for j, (i,yi) in enumerate(zip(Z,y)):
+            vec[j] = - jac_calc(np.inner(v[i,:], x), yi, gamma)
+        return w * x  - v[Z,:].T @ vec
+    def fprime(x):
+        vec = np.zeros(l)
+        for j, (i,yi) in enumerate(zip(Z, y)):
+            vec[j] = -hess_calc(np.inner(v[i,:], x), yi, gamma)
+
+        H = (-v[Z,:].T * vec) @ v[Z,:]
+        H[np.diag_indices(n)] += w
+        return H
+    x0 = np.random.rand(len(w))
+    res = root(f, x0, jac=fprime)
+    #print(f"Root Finding is successful: {res.success}")
+    return res.x
+
+
 
 class CrossEntropyGraphBasedSSLModelReduced(object):
     '''
@@ -268,7 +331,7 @@ class CrossEntropyGraphBasedSSLModelReduced(object):
         if self.v.shape[0] == self.v.shape[1]:
             print("Warning : It appears that you've given the full spectrum, this class is not optimized for that case...")
         self.w = w
-        #self.d = (self.tau ** (-2.)) * ((self.w + self.tau**2.))
+        #self.d = (self.tau ** (-2.)) * (self.w + self.tau**2.)
         self.d = self.w + self.tau**2.
         self.full_storage = False
         self.modelname = "ce"
