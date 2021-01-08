@@ -4,7 +4,7 @@
 # Need to implement acquisition_values function more efficiently, record values if debug is on.
 import numpy as np
 from .dijkstra import *
-from .al_util import *
+from .al_util import * 
 from .acquisitions import *
 from .rkhs import *
 

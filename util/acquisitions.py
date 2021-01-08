@@ -1,8 +1,8 @@
 # author: Kevin Miller
-# THIS IS 'aquisition_batch_newest.py' WITH A DIFFERENT NAME FOR FINAL VERSIONS
+
 import numpy as np
 from scipy.stats import norm
-from util.al_util import *
+from .al_util import *
 import time
 
 MODELS = ['gr', 'probit-log', 'probit-norm', 'ce', 'log', 'probitnorm', 'mgr']

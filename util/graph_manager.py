@@ -1,6 +1,7 @@
-import sys
-sys.path.append('..')
-from util.mlflow_util import load_uri, get_prev_run
+# import sys
+# sys.path.append('..')
+# from util.mlflow_util import load_uri, get_prev_run
+from .mlflow_util import load_uri, get_prev_run
 import numpy as np
 import scipy.sparse as sps
 import scipy.linalg as sla

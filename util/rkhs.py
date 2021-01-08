@@ -210,7 +210,7 @@ if __name__ == "__main__":
     import sys
     sys.path.append('..')
     import os
-    from al_util import get_acc
+    from runs_util import get_acc
     parser = ArgumentParser(description="Read in previous RKHS run and check classifier")
     parser.add_argument("--loc", default='../checker2/db-rkhs-2000-0.1-0.1/rand-top-5-100-1.txt', type=str)
     parser.add_argument("--Xloc", default='../checker2/X_labels.npz', type=str)
