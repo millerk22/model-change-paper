@@ -68,7 +68,7 @@ if __name__ == "__main__":
 
     print("Loading data at {}".format(args.data_root + 'X_labels.npz'))
     data = np.load(args.data_root + 'X_labels.npz', allow_pickle=True)
-    X, labels = data['X'], data['labels']
+    X, labels = data['X'], data['labels'].flatten()
     N = X.shape[0]
 
 
