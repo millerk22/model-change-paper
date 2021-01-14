@@ -118,6 +118,9 @@ if __name__ == "__main__":
         experiment = client.get_experiment_by_name(args.experiment_name)
 
         for i, seed in enumerate(j**2 + 3 for j in range(args.runs)):
+            print("=======================================")
+            print("============= Run {}/{} ===============".format(i+1, args.runs))
+            print("=======================================")
             np.random.seed(seed)
             init_labeled, unlabeled = train_test_split(np.arange(N), train_size=args.lab_start, stratify=labels)
             init_labeled, unlabeled = list(init_labeled), list(unlabeled)
