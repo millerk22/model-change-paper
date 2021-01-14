@@ -435,7 +435,7 @@ class HFGraphBasedSSLModel(object):
         self.modelname = 'hf'
         self.full_storage = True
         self.N = L.shape[0]
-        self.L = L + delta**2. * sps.eye(self.N)
+        self.L = L + delta**2. * sp.sparse.eye(self.N)
         self.f = None
         self.C = None
         return
