@@ -16,8 +16,10 @@ import mlflow
 from util.mlflow_util import *
 
 
-ACQ_MODELS = ['vopt--mgr', 'sopt--mgr', 'sopt--hf', 'mc--mgr', 'mcgreedy--ce', 'mc--ce', \
-        'rand--ce', 'rand--mgr', 'vopt--hf', 'uncertainty--mgr', 'uncertainty--ce']
+# ACQ_MODELS = ['vopt--mgr', 'sopt--mgr', 'sopt--hf', 'mc--mgr', 'mcgreedy--ce', 'mc--ce', \
+#         'rand--ce', 'rand--mgr', 'vopt--hf', 'uncertainty--mgr', 'uncertainty--ce']
+#ACQ_MODELS = ['mcgreedy--ce']
+ACQ_MODELS = ['vopt--mgr']
 
 
 

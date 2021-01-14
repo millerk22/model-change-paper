@@ -1,5 +1,5 @@
 '''
-Graph Based SSL model class file -- TODO: comment the classes 
+Graph Based SSL model class file -- TODO: comment the classes
 '''
 from .al_util import *
 
@@ -201,8 +201,13 @@ class BinaryGraphBasedSSLModelReduced(object):
                     self.C_a -= hess_calc(mk, yk, self.gamma)/(1. + ip * hess_calc(mk, yk, self.gamma))*np.outer(C_a_vk, C_a_vk)
                 else:
                     raise ValueError("model name %s not recognized or implemented" % str(model))
-
-                self.unlabeled.remove(k)
+                try:
+                    self.unlabeled.remove(k)
+                except:
+                    print(k)
+                    print(Q)
+                    print(self.labeled)
+                    print(self.unlabeled)
             self.m = self.v @ self.alpha
             self.labeled += list(Q)
             if self.nc > 2:
@@ -270,8 +275,8 @@ class CrossEntropyGraphBasedSSLModelReduced(object):
         if self.v.shape[0] == self.v.shape[1]:
             print("Warning : It appears that you've given the full spectrum, this class is not optimized for that case...")
         self.w = w
-        #self.d = (self.tau ** (-2.)) * (self.w + self.tau**2.)
-        self.d = self.w + self.tau**2.
+        self.d = (self.tau ** (-2.)) * (self.w + self.tau**2.)
+        #self.d = self.w + self.tau**2.
         self.full_storage = False
         self.modelname = "ce"
         self.m = None
