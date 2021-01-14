@@ -459,8 +459,8 @@ def probit_map_st2_alpha(Z, y,  gamma, w, v):
 # ################################################################################
 #
 #
-# def pdf_deriv(t, gamma):
-#     return -t*norm.pdf(t, scale = gamma)/(gamma**2)
+def pdf_deriv(t, gamma):
+    return -t*norm.pdf(t, scale = gamma)/(gamma**2)
 #
 # def jac_calc(uj_, yj_, gamma):
 #     return -yj_*(norm.pdf(uj_*yj_, scale=gamma)/norm.cdf(uj_*yj_, scale=gamma))
