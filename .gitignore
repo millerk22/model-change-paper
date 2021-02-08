@@ -2,4 +2,5 @@
 *.DS_Store
 mlruns/
 *run_experiments_*.py
-
+*.pkl
+ 
