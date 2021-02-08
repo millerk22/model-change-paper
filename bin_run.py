@@ -16,12 +16,9 @@ import mlflow
 from util.mlflow_util import *
 
 
-# These are acq-model pairs available for a multiclass problem
-ACQ_MODELS = ['vopt--gr', 'sopt--gr', 'sopt--hf', 'mc--probitnorm', 'rand--gr', \
-        'rand--log', 'rand--probitnorm', 'mc--gr', 'mc--probitnorm', 'vopt--hf',
-        'uncertainty--gr', 'uncertainty--log', 'uncertainty--probitnorm', 'db--rkhs']
+ACQ_MODELS = ['vopt--gr', 'sopt--gr', 'db--rkhs', 'mc--gr', 'mc--log', 'mc--probitnorm', 'sopt--hf', 'vopt--hf',
+                'uncertainty--gr', 'uncertainty--log', 'uncertainty--probitnorm', 'rand--gr', 'rand--log', 'rand--probitnorm']
 
-EXPERIMENT_NAME = 'dataset'
 
 GRAPH_PARAMS = {
     'knn' :10,
@@ -32,61 +29,60 @@ GRAPH_PARAMS = {
 
 
 
-
-
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description = 'Run Active Learning experiment on Binary class dataset located at --data_root.')
-    parser.add_argument('--data_root', default='./data/dataset/', type=str, help='Location of data X with labels.')
-    parser.add_argument('--n_eigs', default=50, dest='M', type=int, help='Number of eigenvalues for spectral truncation')
-    parser.add_argument('--tau', default=0.01, dest='tau_gr', type=float, help='value of diagonal perturbation and scaling of MGR (not HF)')
-    parser.add_argument('--gamma', default=0.1, dest='gamma_gr', type=float, help='value of noise parameter of MGR (not HF)')
+    parser = argparse.ArgumentParser(description = 'Run Active Learning experiment on Binary dataset')
+    parser.add_argument('--data-root', default='./data/binary/', dest='data_root', type=str, help='Location of data X with labels.')
+    parser.add_argument('--num-eigs', default=50, dest='M', type=int, help='Number of eigenvalues for spectral truncation')
+    parser.add_argument('--tau', default=0.005, type=float, help='value of diagonal perturbation and scaling of GBSSL models (minus HF)')
+    parser.add_argument('--gamma', default=0.1, type=float, help='value of noise parameter to be shared across all GBSSL models (minus HF)')
     parser.add_argument('--delta', default=0.01, type=float, help='value of diagonal perturbation of unnormalized graph Laplacian for HF model.')
+    parser.add_argument('--h', default=0.1, type=float, help='kernel width for RKHS model.')
     parser.add_argument('--B', default=5, type=int, help='batch size for AL iterations')
-    parser.add_argument('--al_iters', default=11, type=int, help='number of active learning iterations to perform.')
+    parser.add_argument('--al-iters', default=100, dest='al_iters', type=int, help='number of active learning iterations to perform.')
     parser.add_argument('--candidate-method', default='rand', type=str, dest='cand', help='candidate set selection method name ["rand", "full"]')
     parser.add_argument('--candidate-percent', default=0.1, type=float, dest='cand_perc', help='if --candidate-method == "rand", then this is the percentage of unlabeled data to consider')
-    parser.add_argument('--select_method', default='top', type=str, help='how to select which points to query from the acquisition values. in ["top", "prop"]')
-    parser.add_argument('--lab-start', default=3, type=int, dest='lab_start', help='size of initially labeled set.')
-    parser.add_argument('--metric', default='euclidean', type=str, help='metric name ("euclidean" or "cosine") for graph construction')
-    parser.add_argument('--name', default=EXPERIMENT_NAME, dest='experiment_name', help='Name for this dataset/experiment run ')
+    parser.add_argument('--select-method', default='top', type=str, dest='select_method', help='how to select which points to query from the acquisition values. in ["top", "prop"]')
     parser.add_argument('--runs', default=5, type=int, help='Number of trials to run')
+    parser.add_argument('--lab-start', default=2, dest='lab_start', type=int, help='Number of initially labeled points.')
+    parser.add_argument('--metric', default='euclidean', type=str, help='metric name ("euclidean" or "cosine") for graph construction')
+    parser.add_argument('--name', default='binary', dest='experiment_name', help='Name for this dataset/experiment run ')
     args = parser.parse_args()
+
 
     GRAPH_PARAMS['n_eigs'] = args.M
     GRAPH_PARAMS['metric'] = args.metric
-
-
+    if args.metric == 'cosine': # HYPERSPECTRAL DATA
+        GRAPH_PARAMS['sigma'] = None
+        GRAPH_PARAMS['zp_k'] = None
 
     if not os.path.exists('tmp/'):
         os.makedirs('tmp/')
 
-    # Load in or Create the Dataset
+    # Load in the Dataset
 
     if not os.path.exists(args.data_root + 'X_labels.npz'):
         raise ValueError("Cannot find previously saved data at {}".format(args.data_root + 'X_labels.npz'))
 
     print("Loading data at {}".format(args.data_root + 'X_labels.npz'))
     data = np.load(args.data_root + 'X_labels.npz', allow_pickle=True)
-    X, labels = data['X'], data['labels']
+    X, labels = data['X'], data['labels'].flatten()
     N = X.shape[0]
 
     labels[labels == 0] = -1
 
 
-    # Load in or calculate eigenvectors, using mlflow IN GraphManager
-
+    # Load in or calculate eigenvectors, using mlflow IN Graph_manager
     gm = GraphManager()
     evals, evecs = gm.from_features(X, knn=GRAPH_PARAMS['knn'], sigma=GRAPH_PARAMS['sigma'],
                         normalized=GRAPH_PARAMS['normalized'], n_eigs=GRAPH_PARAMS['n_eigs'],
                         zp_k=GRAPH_PARAMS['zp_k'], metric=GRAPH_PARAMS['metric']) # runs mlflow logging in this function call
 
-    L = None
     # If we are doing a run with the HF model, we need the unnormalized graph Laplacian
+    L = None
     if 'hf' in ''.join(ACQ_MODELS):
-        print("Since HF model include in ACQ_MODELS, calculating (or finding) the full graph laplacian L...")
         prev_run = get_prev_run('GraphManager.from_features',
                                 GRAPH_PARAMS,
-                                tags={"X":str(X)},
+                                tags={"X":str(X), "N":str(X.shape[0])},
                                 git_commit=None)
 
         url_data = urllib.parse.urlparse(os.path.join(prev_run.info.artifact_uri,
@@ -113,13 +109,16 @@ if __name__ == "__main__":
     else:
 
         client = mlflow.tracking.MlflowClient()
-
+        #experiment_name = 'checker2'
         mlflow.set_experiment(args.experiment_name)
         experiment = client.get_experiment_by_name(args.experiment_name)
 
         for i, seed in enumerate(j**2 + 3 for j in range(args.runs)):
+            print("=======================================")
+            print("============= Run {}/{} ===============".format(i+1, args.runs))
+            print("=======================================")
             np.random.seed(seed)
-            init_labeled, unlabeled = train_test_split(np.arange(N), train_size=args.lab_start, stratify=labels)
+            init_labeled, unlabeled = train_test_split(np.arange(N), train_size=2, stratify=labels)#list(np.random.choice(range(N), 10, replace=False))
             init_labeled, unlabeled = list(init_labeled), list(unlabeled)
 
             params_shared = {
@@ -144,16 +143,15 @@ if __name__ == "__main__":
                     print("\t", thing)
                 print()
 
-
             np.save('tmp/init_labeled', init_labeled)
 
             for acq, model in (am.split('--') for am in ACQ_MODELS):
                 if model == 'hf':
                     run_name = "{}-{}-{:.2f}-{}".format(acq, model, args.delta, i)
-                elif model == 'ce':
-                    run_name = "{}-{}-{:.2f}-{:.2f}-{}-{}".format(acq, model, args.tau_ce, args.gamma_ce, args.M, i)
+                elif model == 'rkhs':
+                    run_name = "{}-{}-{:.2}-{}".format(acq, model, args.h, i)
                 else:
-                    run_name = "{}-{}-{:.2f}-{:.2f}-{}-{}".format(acq, model, args.tau_gr, args.gamma_gr, args.M, i)
+                    run_name = "{}-{}-{:.3f}-{:.3f}-{}-{}".format(acq, model, args.tau, args.gamma, args.M, i)
 
                 if run_name not in already_completed:
                     labeled = copy.deepcopy(init_labeled)
@@ -185,7 +183,3 @@ if __name__ == "__main__":
             os.remove('tmp/init_labeled.npy')
         if os.path.exists('tmp/iter_stats.npz'):
             os.remove('tmp/iter_stats.npz')
-        if os.path.exists('tmp/W.npz'):
-            os.remove('tmp/W.npz')
-        if os.path.exists('tmp/eig.npz'):
-            os.remove('tmp/eig.npz')

@@ -38,7 +38,7 @@ class GraphManager(object):
         assert metric in METRICS
 
         print("Computing (or retrieving) graph evals and evecs with parameters:")
-        print("\tN = {}, knn = {}, sigma = {:.2f}".format(X.shape[0], knn, sigma))
+        print("\tN = {}, knn = {}, sigma = {}".format(X.shape[0], knn, sigma))
         print("\tnormalized = {}, n_eigs = {}, zp_k = {}".format(normalized, n_eigs, zp_k))
         print("\tmetric = {}".format(metric))
         print()
@@ -55,7 +55,7 @@ class GraphManager(object):
             }
             prev_run = get_prev_run('GraphManager.from_features',
                                     params,
-                                    tags={"X":str(X)},
+                                    tags={"X":str(X), "N":str(X.shape[0])},
                                     git_commit=None)
             if prev_run is not None:
                 print('Found previous eigs')
@@ -79,6 +79,7 @@ class GraphManager(object):
             sps.save_npz('./tmp/W.npz', W)
             mlflow.set_tag('function', 'GraphManager.from_features')
             mlflow.set_tag('X', str(X))
+            mlflow.set_tag('N', str(X.shape[0]))
             mlflow.log_params(params)
             mlflow.log_artifact('./tmp/eigs.npz')
             mlflow.log_artifact('./tmp/W.npz')
@@ -118,17 +119,25 @@ class GraphManager(object):
         # accomodate Zelnik-Perona scaling
         n_nonzero = N * knn
         A_indptr = np.arange(0, n_nonzero + 1, knn)
-        if zp_k is not None:
+        if zp_k is not None and metric == 'euclidean':
             k_dist = A_data[:,zp_k][:,np.newaxis]
             k_dist[k_dist < 1e-4] = 1e-4
             A_data /= np.sqrt(k_dist * k_dist[A_ind,0])
 
         A_data = np.ravel(A_data)
-        W = sps.csr_matrix((np.exp(-(A_data ** 2)/sigma),
+        if metric == 'cosine':
+            print(np.max(A_data))
+            W = sps.csr_matrix(((1.-A_data), # need to do 1.-A_data since NNDescent returns cosine DISTANCE (1. - cosine_similarity)
+                                A_ind.ravel(),
+                                A_indptr),
+                                shape=(N, N))
+        else:
+            W = sps.csr_matrix((np.exp(-(A_data ** 2)/sigma),
                             A_ind.ravel(),
                             A_indptr),
                             shape=(N, N))
         W = (W + W.T)/2
+        #W = max(W, W.T)
         W.setdiag(0)
         W.eliminate_zeros()
 

@@ -16,9 +16,8 @@ import mlflow
 from util.mlflow_util import *
 
 
-ACQ_MODELS = ['vopt--gr', 'sopt--gr', 'sopt--hf', 'mc--probitnorm', 'rand--gr', \
-        'rand--log', 'rand--probitnorm', 'mc--gr', 'mc--probitnorm', 'vopt--hf',
-        'uncertainty--gr', 'uncertainty--log', 'uncertainty--probitnorm', 'db--rkhs']
+ACQ_MODELS = ['vopt--gr', 'sopt--gr', 'db--rkhs', 'mc--gr', 'mc--log', 'mc--probitnorm', 'sopt--hf', 'vopt--hf',
+                'uncertainty--gr', 'uncertainty--log', 'uncertainty--probitnorm', 'rand--gr', 'rand--log', 'rand--probitnorm']
 
 GRAPH_PARAMS = {
     'knn' :10,
@@ -28,48 +27,26 @@ GRAPH_PARAMS = {
 }
 
 
-def create_checkerboard2(N):
-    X = np.random.rand(N,2)
-    labels = []
-    for x in X:
-        i, j = 0,0
-        if 0.25 <= x[0] and x[0] < 0.5:
-            i = 1
-        elif 0.5 <= x[0] and x[0] < 0.75:
-            i = 2
-        elif 0.75 <= x[0]:
-            i = 3
-
-        if 0.25 <= x[1] and x[1] < 0.5:
-            j = 1
-        elif 0.5 <= x[1] and x[1] < 0.75:
-            j = 2
-        elif 0.75 <= x[1]:
-            j = 3
-
-        labels.append((i+j) % 2)
-    return X, np.array(labels)
-
-
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description = 'Run Active Learning experiment on Checkerboard 2 dataset')
-    parser.add_argument('--data_root', default='./data/checker2/', type=str, help='Location of data X with labels.')
-    parser.add_argument('--num_eigs', default=50, dest='M', type=int, help='Number of eigenvalues for spectral truncation')
-    parser.add_argument('--tau', default=0.01, type=float, help='value of diagonal perturbation and scaling of GBSSL models (minus HF)')
+    parser.add_argument('--data-root', default='./data/checker2/', dest='data_root', type=str, help='Location of data X with labels.')
+    parser.add_argument('--num-eigs', default=50, dest='M', type=int, help='Number of eigenvalues for spectral truncation')
+    parser.add_argument('--tau', default=0.005, type=float, help='value of diagonal perturbation and scaling of GBSSL models (minus HF)')
     parser.add_argument('--gamma', default=0.1, type=float, help='value of noise parameter to be shared across all GBSSL models (minus HF)')
     parser.add_argument('--delta', default=0.01, type=float, help='value of diagonal perturbation of unnormalized graph Laplacian for HF model.')
     parser.add_argument('--h', default=0.1, type=float, help='kernel width for RKHS model.')
     parser.add_argument('--B', default=5, type=int, help='batch size for AL iterations')
-    parser.add_argument('--al_iters', default=100, type=int, help='number of active learning iterations to perform.')
+    parser.add_argument('--al-iters', default=100, type=int, dest='al_iters', help='number of active learning iterations to perform.')
     parser.add_argument('--candidate-method', default='rand', type=str, dest='cand', help='candidate set selection method name ["rand", "full"]')
     parser.add_argument('--candidate-percent', default=0.1, type=float, dest='cand_perc', help='if --candidate-method == "rand", then this is the percentage of unlabeled data to consider')
-    parser.add_argument('--select_method', default='top', type=str, help='how to select which points to query from the acquisition values. in ["top", "prop"]')
+    parser.add_argument('--select-method', default='top', type=str, dest='select_method', help='how to select which points to query from the acquisition values. in ["top", "prop"]')
     parser.add_argument('--runs', default=5, type=int, help='Number of trials to run')
     parser.add_argument('--lab-start', default=2, dest='lab_start', type=int, help='Number of initially labeled points.')
     parser.add_argument('--metric', default='euclidean', type=str, help='metric name ("euclidean" or "cosine") for graph construction')
     parser.add_argument('--name', default='checker2', dest='experiment_name', help='Name for this dataset/experiment run ')
+    parser.add_argument('--N', default=2000, type=int, help='number of data points in the dataset')
     args = parser.parse_args()
 
 
@@ -83,7 +60,7 @@ if __name__ == "__main__":
     if not os.path.exists(args.data_root + 'X_labels.npz'):
         print("Cannot find previously saved data at {}".format(args.data_root + 'X_labels.npz'))
         print("so creating the dataset and labels")
-        N = 2000
+        N = args.N
         X, labels = create_checkerboard2(N)
         os.makedirs(args.data_root)
         np.savez(args.data_root + 'X_labels.npz', X=X, labels=labels)
@@ -107,7 +84,7 @@ if __name__ == "__main__":
     if 'hf' in ''.join(ACQ_MODELS):
         prev_run = get_prev_run('GraphManager.from_features',
                                 GRAPH_PARAMS,
-                                tags={"X":str(X)},
+                                tags={"X":str(X), "N":str(X.shape[0])},
                                 git_commit=None)
 
         url_data = urllib.parse.urlparse(os.path.join(prev_run.info.artifact_uri,
@@ -134,11 +111,13 @@ if __name__ == "__main__":
     else:
 
         client = mlflow.tracking.MlflowClient()
-        experiment_name = 'checker2'
-        mlflow.set_experiment(experiment_name)
-        experiment = client.get_experiment_by_name(experiment_name)
+        mlflow.set_experiment(args.experiment_name)
+        experiment = client.get_experiment_by_name(args.experiment_name)
 
         for i, seed in enumerate(j**2 + 3 for j in range(args.runs)):
+            print("=======================================")
+            print("============= Run {}/{} ===============".format(i+1, args.runs))
+            print("=======================================")
             np.random.seed(seed)
             init_labeled, unlabeled = train_test_split(np.arange(N), train_size=2, stratify=labels)#list(np.random.choice(range(N), 10, replace=False))
             init_labeled, unlabeled = list(init_labeled), list(unlabeled)
@@ -173,7 +152,7 @@ if __name__ == "__main__":
                 elif model == 'rkhs':
                     run_name = "{}-{}-{:.2}-{}".format(acq, model, args.h, i)
                 else:
-                    run_name = "{}-{}-{:.2f}-{:.2f}-{}-{}".format(acq, model, args.tau, args.gamma, args.M, i)
+                    run_name = "{}-{}-{:.3f}-{:.3f}-{}-{}".format(acq, model, args.tau, args.gamma, args.M, i)
 
                 if run_name not in already_completed:
                     labeled = copy.deepcopy(init_labeled)

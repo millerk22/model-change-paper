@@ -207,7 +207,7 @@ class BinaryGraphBasedSSLModelReduced(object):
                     print(k)
                     print(Q)
                     print(self.labeled)
-                    print(self.unlabeled)
+                    #print(self.unlabeled)
             self.m = self.v @ self.alpha
             self.labeled += list(Q)
             if self.nc > 2:
@@ -275,8 +275,8 @@ class CrossEntropyGraphBasedSSLModelReduced(object):
         if self.v.shape[0] == self.v.shape[1]:
             print("Warning : It appears that you've given the full spectrum, this class is not optimized for that case...")
         self.w = w
-        self.d = (self.tau ** (-2.)) * (self.w + self.tau**2.)
-        #self.d = self.w + self.tau**2.
+        #self.d = (self.tau ** (-2.)) * (self.w + self.tau**2.)
+        self.d = self.w + self.tau**2.
         self.full_storage = False
         self.modelname = "ce"
         self.m = None
@@ -313,14 +313,67 @@ class CrossEntropyGraphBasedSSLModelReduced(object):
         ''' Calculate the SoftMax MAP estimator
 
         Z : list of labeled nodes
-        y : (len(Z_), nc) numpy array of onehot vectors as rows
+        y : (len(Z), nc) numpy array of onehot vectors as rows
         '''
+        #print('newton = {}'.format(newton))
+        y = np.array(y) # in case y is a numpy matrix instead of numpy array
+        vZ_ = self.v[Z,:]
 
+        def f(x):
+            pi_Z = np.exp(vZ_ @ x.reshape(self.nc, self.M).T)
+            pi_Z /= np.sum(pi_Z, axis=1)[:, np.newaxis]
+            vec = np.empty(self.M*self.nc)
+            for c in range(self.nc):
+                vec[c*self.M:(c+1)*self.M] = vZ_.T @ (pi_Z[:,c] - y[:,c])
+            return np.tile(self.gamma*self.d, (1,self.nc)).flatten() * x + vec
+
+        def fprime(x):
+            pi_Z = np.exp(vZ_ @ x.reshape(self.nc, self.M).T)
+            pi_Z /= np.sum(pi_Z, axis=1)[:, np.newaxis]
+            H = np.empty((self.M*self.nc, self.M*self.nc))
+            for c in range(self.nc):
+                for m in range(c,self.nc):
+                    Bmc = 1.*(m == c)*pi_Z[:,c] - pi_Z[:,c]*pi_Z[:,m]
+                    H[c*self.M:(c+1)*self.M, m*self.M:(m+1)*self.M] = (vZ_.T * Bmc) @ vZ_
+                    if m != c:
+                        H[m*self.M:(m+1)*self.M, c*self.M:(c+1)*self.M] = H[c*self.M:(c+1)*self.M, m*self.M:(m+1)*self.M]
+            H /= self.gamma
+            H.ravel()[::(self.M*self.nc+1)] += np.tile(self.gamma*self.d, (1, self.nc)).flatten()
+            return H
+
+        x0 = np.random.randn(self.N, self.nc)
+        x0[Z,:] = y
+        x0 = (self.v.T @ x0).T.flatten()
+        if newton:
+            #print("Second Order")
+            res = root(f, x0, jac=fprime, tol=1e-9)
+        else:
+            #print("First Order")
+            res = root(f, x0, tol=1e-10, method='krylov')
+        if not res.success:
+            print(res.success)
+            print(np.linalg.norm(f(res.x)))
+            print(res.message)
+
+            res = root(f,x0, tol=1e-10, method='krylov')
+
+        # return both alpha and H_a, the Hessian at alpha
+        return res.x, fprime(res.x)
+
+    def get_alpha_old(self, Z, y, newton=True):
+        ''' Calculate the SoftMax MAP estimator
+
+        Z : list of labeled nodes
+        y : (len(Z), nc) numpy array of onehot vectors as rows
+        '''
+        print('newton = {}'.format(newton))
         y = np.array(y) # in case y is a numpy matrix instead of numpy array
         vZ_ = self.v[Z,:]/self.gamma
 
         def f(x):
             pi_Z = np.exp(vZ_ @ x.reshape(self.nc, self.M).T)
+            print(np.max(np.max(pi_Z)), np.min(np.min(pi_Z)))
+            print(np.max(np.sum(pi_Z, axis=1)), np.min(np.sum(pi_Z, axis=1)))
             pi_Z /= np.sum(pi_Z, axis=1)[:, np.newaxis]
             vec = np.empty(self.M*self.nc)
             for c in range(self.nc):
@@ -354,6 +407,7 @@ class CrossEntropyGraphBasedSSLModelReduced(object):
             print(res.success)
             print(np.linalg.norm(f(res.x)))
             print(res.message)
+
             res = root(f,x0, tol=1e-10, method='krylov')
 
         # return both alpha and H_a, the Hessian at alpha
@@ -428,7 +482,7 @@ class CrossEntropyGraphBasedSSLModelReduced(object):
 
 
 class HFGraphBasedSSLModel(object):
-    ''' We implement the ''full'' HF model only for comparisons.
+    ''' We implement the ''full'' HF model for comparisons.
 
     '''
     def __init__(self, delta, L):
