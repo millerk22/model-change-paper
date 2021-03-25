@@ -2,9 +2,6 @@ import numpy as np
 import time
 import sys
 from sklearn.preprocessing import OneHotEncoder
-# sys.path.append('..')
-# from util.activelearner import *
-# from util.gbssl import *
 
 from .activelearner import *
 from .gbssl import *
@@ -68,7 +65,7 @@ def create_checkerboard3(N):
     labels[labels == 7] = 2
     return X, labels
 
-    
+
 
 def run_binary(w, v, tau, gamma, oracle, init_labeled, num_al_iters, B_per_al_iter, modelname='gr', acq='mc',
                           cand='rand', select_method='top', full=False,
@@ -250,7 +247,7 @@ def run_rkhs_hf(oracle, init_labeled, num_al_iters, B_per_al_iter, modelname='rk
 
 
 def run_multi(w, v, tau, gamma, oracle, init_labeled, num_al_iters, B_per_al_iter,
-                         modelname='gr', acq='mc', cand='rand', select_method='top', full=False,
+                         modelname='mgr', acq='mc', cand='rand', select_method='top', full=False,
                           verbose=False):
     '''
     Inputs:
