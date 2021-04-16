@@ -37,7 +37,7 @@ def mc_full(Cand, m, C, modelname, gamma=0.1):
         else:
             return np.array([np.absolute(m[k] - sgn(m[k]))/(gamma**2. + C[k,k]) * np.linalg.norm(C[:,k]) for k in Cand])
 
-def mc_reduced(C_a, alpha, v_Cand, modelname, uks=None, gamma=0.1, verbose=False, greedy=False):
+def mc_reduced(C_a, alpha, v_Cand, modelname, uks=None, gamma=0.1, verbose=False, greedy=True):
     if modelname not in MODELS:
         raise ValueError("%s is not a valid model name, must be in %s" % (modelname, MODELS))
 
@@ -118,51 +118,6 @@ def mc_reduced(C_a, alpha, v_Cand, modelname, uks=None, gamma=0.1, verbose=False
 
         return np.array(mc_vals)
 
-
-        # OLD implementation
-        # num_cand, M = v_Cand.shape
-        # nc = alpha.shape[0]//M
-        #
-        # if uks is None:
-        #     uks = v_Cand @ (alpha.reshape(nc, M).T)
-        #
-        # v_Cand /= gamma
-        # piks = np.exp(uks/gamma)
-        # piks /= np.sum(piks, axis=1)[:,np.newaxis]
-        #
-        # C_aV_candT = np.empty((M*nc, num_cand*nc))
-        # for c in range(nc):
-        #     C_aV_candT[:,c*num_cand:(c+1)*num_cand] = C_a[:,c*M:(c+1)*M] @ v_Cand.T
-        #
-        # mc_vals = []
-        # for k in range(num_cand):
-        #     inds_k_in_cand = [k + c*num_cand for c in range(nc)]
-        #     B_k = np.diag(piks[k,:]) - np.outer(piks[k,:], piks[k,:])
-        #     CVT_k = C_aV_candT[:, inds_k_in_cand]
-        #     VCVT_k = np.empty((nc, nc))
-        #     for c in range(nc):
-        #         VCVT_k[c,:] = v_Cand[k,:][np.newaxis,:] @ C_aV_candT[c*M:(c+1)*M, inds_k_in_cand]
-        #
-        #     Mk = np.linalg.inv(VCVT_k) + B_k
-        #     Mk = (B_k @ np.linalg.inv(Mk)) - np.eye(nc)
-        #     Mk = (Mk @ (B_k @ VCVT_k)) + np.eye(nc)
-        #     Mk = CVT_k @ Mk
-        #     if not greedy:
-        #         Mkpi_k_yk_mat = Mk @ (np.tile(piks[k,:][:,np.newaxis], (1,nc))  - np.eye(nc))
-        #         mc_vals_for_k = [np.linalg.norm(Mkpi_k_yk_mat[:,c]) for c in range(nc)]
-        #
-        #         argmin_mcvals = np.argmin(mc_vals_for_k)
-        #         argmax_piks = np.argmax(piks[k,:])
-        #
-        #         if (argmin_mcvals != argmax_piks) and verbose:
-        #             print("%d (index in Cand) did Not choose choice that we thought" % k)
-        #         mc_vals.append(np.min(mc_vals_for_k))
-        #     else:
-        #         y_c = np.zeros(nc)
-        #         y_c[np.argmax(piks[k,:])] = 1.
-        #         mc_vals.append(np.linalg.norm(Mk @ (piks[k,:] - y_c)))
-        #
-        # return np.array(mc_vals)
 
 
     else:
