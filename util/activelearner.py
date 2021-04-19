@@ -186,9 +186,9 @@ class ActiveLearner(object):
                     p = np.exp(acq_vals/prop_sigma)
                     p /= np.sum(p)
                 else:
-                    p = prop_func(acq_vals)
+                    p = prop_func(self.acq_vals)
                 if debug:
-                    return list(np.random.choice(Cand, B, replace=False, p=p)), p, acq_vals, Cand
+                    return list(np.random.choice(Cand, B, replace=False, p=p)), p, self.acq_vals, Cand
                 return list(np.random.choice(Cand, B, replace=False, p=p))
             else:
                 raise ValueError("Have not implemented this selection method, %s. Somehow got passed other parameter checks..." % method)
