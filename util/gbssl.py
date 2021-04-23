@@ -549,7 +549,7 @@ class HFGraphBasedSSLModel(object):
 
     def vopt_vals(self, Cand):
         unl_Cand = [self.unlabeled.index(k) for k in Cand]
-        return np.linalg.norm(self.C[:, unl_Cand], axis=0) / self.C[unl_Cand, unl_Cand]
+        return np.linalg.norm(self.C[:, unl_Cand], axis=0)**2. / self.C[unl_Cand, unl_Cand]
 
     def sopt_vals(self, Cand):
         unl_Cand = [self.unlabeled.index(k) for k in Cand]
