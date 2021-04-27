@@ -204,6 +204,12 @@ class RKHSClassifier(object):
         sc = self.K[np.ix_(self.unlabeled, Cand)] - self.K_ul @ self.K_inv @ KCandl.T
         return (1. - np.absolute(self.f[Cand]))*np.linalg.norm(sc, axis=0)/sc[unl_Cand, range(len(Cand))]
 
+    def return_parts(self, Cand):
+        unl_Cand = [self.unlabeled.index(k) for k in Cand]
+        KCandl = self.K_ul[unl_Cand,:]
+        sc = self.K[np.ix_(self.unlabeled, Cand)] - self.K_ul @ self.K_inv @ KCandl.T
+        return (1. - np.absolute(self.f[Cand])), np.linalg.norm(sc, axis=0), 1./sc[unl_Cand, range(len(Cand))]
+
 
 
 if __name__ == "__main__":
