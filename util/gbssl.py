@@ -13,7 +13,7 @@ class BinaryGraphBasedSSLModel(object):
 
     Get rid of storing eigenvectors and eigenvalues?? (Since we're already committing to storing C_tau and C fully)
     '''
-    def __init__(self, modelname, gamma, tau, v=None, w=None, Ct=None):
+    def __init__(self, modelname, gamma, tau, v=None, w=None, Ct=None, t=None):
         self.gamma = gamma
         self.tau = tau
         if v is None:
@@ -26,8 +26,12 @@ class BinaryGraphBasedSSLModel(object):
         else:
             self.trunc = False
         self.w = w
-        #self.d = (self.tau ** (-2.)) * ((self.w + self.tau**2.))
-        self.d = self.w + self.tau**2.
+        if t is not None: # heat kernel option, self.d is the diagonal of Lambda (evals) matrix
+            assert type(t) in [int, float], "Parameter 't' must either be of type int or float"
+            self.d = np.exp(t*self.w)
+        else:
+            #self.d = (self.tau ** (-2.)) * ((self.w + self.tau**2.))
+            self.d = self.w + self.tau**2.
         if Ct is not None:
             self.Ct = Ct
         else:
@@ -134,7 +138,7 @@ class BinaryGraphBasedSSLModelReduced(object):
     '''
 
     '''
-    def __init__(self, modelname, gamma, tau, v=None, w=None):
+    def __init__(self, modelname, gamma, tau, v=None, w=None, t=None):
         self.gamma = gamma
         self.tau = tau
         if v is None:
@@ -146,8 +150,12 @@ class BinaryGraphBasedSSLModelReduced(object):
         if self.v.shape[0] == self.v.shape[1]:
             print("Warning : It appears that you've given the full spectrum, this class is not optimized for that case...")
         self.w = w
-        #self.d = (self.tau ** (-2.)) * ((self.w + self.tau**2.))
-        self.d = self.w + self.tau**2.
+        if t is not None: # heat kernel option, self.d is the diagonal of Lambda (evals) matrix
+            assert type(t) in [int, float], "Parameter 't' must either be of type int or float"
+            self.d = np.exp(t*self.w)
+        else:
+            #self.d = (self.tau ** (-2.)) * ((self.w + self.tau**2.))
+            self.d = self.w + self.tau**2.
         if modelname not in VALID_MODELS:
             raise ValueError("%s is not a valid modelname, must be in %s" % (modelname, str(VALID_MODELS)))
         self.full_storage = False
@@ -262,7 +270,7 @@ class CrossEntropyGraphBasedSSLModelReduced(object):
     '''
     Softmax model implementation is only available in the reduced case.
     '''
-    def __init__(self, gamma, tau, v=None, w=None):
+    def __init__(self, gamma, tau, v=None, w=None, t=None):
         self.gamma = gamma
         self.tau = tau
         if v is None:
@@ -275,8 +283,12 @@ class CrossEntropyGraphBasedSSLModelReduced(object):
         if self.v.shape[0] == self.v.shape[1]:
             print("Warning : It appears that you've given the full spectrum, this class is not optimized for that case...")
         self.w = w
-        #self.d = (self.tau ** (-2.)) * (self.w + self.tau**2.)
-        self.d = self.w + self.tau**2.
+        if t is not None: # heat kernel option, self.d is the diagonal of Lambda (evals) matrix
+            assert type(t) in [int, float], "Parameter 't' must either be of type int or float"
+            self.d = np.exp(t*self.w)
+        else:
+            #self.d = (self.tau ** (-2.)) * (self.w + self.tau**2.)
+            self.d = self.w + self.tau**2.
         self.full_storage = False
         self.modelname = "ce"
         self.m = None
