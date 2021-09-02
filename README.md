@@ -1,7 +1,7 @@
 # Model Change Active Learning Paper
 ## (To Appear)
 
-Python code for doing active learning in graph-based semi-supervised learning (GBSSL) paradigm. Implements testing done in my paper that will soon appear and be submitted for peer-review.
+Python code for doing active learning in graph-based semi-supervised learning (GBSSL) paradigm. Implements testing done in paper that will soon appear and be submitted for peer-review.
 
 ## Usage
 
