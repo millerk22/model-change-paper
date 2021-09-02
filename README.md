@@ -16,7 +16,13 @@ To run tests in this framework, edit ``run_experiments_binary.py`` or ``run_expe
 
 ## Results in Paper
 Example plots from code in ``results/acc_figures.py``
-### Multiclass Gaussian Regression
+#### Multiclass Gaussian Regression
 MNIST           |  Salinas A       | Urban 
 :-------------------------:|:-------------------------:|:-------------------------:
 ![](results/gh-pics/acc-mgr-mnist.png) |  ![](results/gh-pics/acc-mgr-salinas.png) | ![](results/gh-pics/acc-mgr-urban.png)
+
+#### Cross-Entropy 
+MNIST           |  Salinas A       | Urban 
+:-------------------------:|:-------------------------:|:-------------------------:
+![](results/gh-pics/acc-ce-mnist.png) |  ![](results/gh-pics/acc-ce-salinas.png) | ![](results/gh-pics/acc-ce-urban.png)
+
