@@ -59,7 +59,7 @@ acq_model2label_marker_color = {
 mlflow.set_tracking_uri('../mlruns')
 client = mlflow.tracking.MlflowClient()
 
-save_root = './for-paper-other/'
+save_root = './for-paper/'
 
 # ## Binary Clusters
 
