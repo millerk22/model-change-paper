@@ -22,7 +22,7 @@ python binary_clusters_run.py --al-iters 20 --B 5 # run batch activate learning 
 ```
 
 ## Results in Paper
-Example plots from code in ``results/acc_figures.py``
+Example plots from code in ``results/acc_figures.py`` (which can be opened as a Jupyter notebook)
 #### Multiclass Gaussian Regression
 MNIST           |  Salinas A       | Urban 
 :-------------------------:|:-------------------------:|:-------------------------:
