@@ -9,7 +9,7 @@ from .acquisitions import *
 from .rkhs import *
 
 
-ACQUISITIONS = ['mc', 'uncertainty', 'rand', 'vopt', 'sopt', 'mbr', 'mcgreedy', 'db']
+ACQUISITIONS = ['mc', 'uncertainty', 'rand', 'vopt', 'sopt', 'mbr', 'mcgreedy', 'db', 'mcavg', 'mcavgf', 'mcf']
 # MODELS = ['gr', 'probit-log', 'probit-norm', 'softmax', 'log', 'probitnorm']
 CANDIDATES = ['rand', 'full', 'dijkstra']
 SELECTION_METHODS = ['top', 'prop', '']
@@ -20,7 +20,7 @@ def sgn(x):
     else:
         return -1.
 
-def acquisition_values(acq, Cand, model):
+def acquisition_values(acq, Cand, model, mcavg_beta=0.0):
     if acq == "mc":
         if model.full_storage:
             return mc_full(Cand, model.m, model.C, model.modelname, gamma=model.gamma)
@@ -28,6 +28,15 @@ def acquisition_values(acq, Cand, model):
             return mc_reduced(model.C_a, model.alpha, model.v[Cand,:], model.modelname, uks=model.m[Cand], gamma=model.gamma)
     elif acq == "mcgreedy":
         return mc_reduced(model.C_a, model.alpha, model.v[Cand,:], model.modelname, uks=model.m[Cand], gamma=model.gamma, greedy=True)
+    elif acq == "mcavg":
+        if not model.full_storage:
+            return mc_avg_reduced(model, Cand, beta=mcavg_beta)
+    elif acq == "mcavgf":
+        if not model.full_storage:
+            return mcavg_app_full_red(model, Cand, beta=mcavg_beta)
+    elif acq == "mcf":
+        if not model.full_storage:
+            return mc_app_full_red(model, Cand)
     elif acq == "uncertainty":
         if len(model.m.shape) > 1: # entropy calculation
             #print('multi unc')
@@ -144,7 +153,7 @@ class ActiveLearner(object):
         #         self.W = None
 
 
-    def select_query_points(self, model, B=1, method='top', prop_func=None, prop_sigma=0.8, debug=False, verbose=False):
+    def select_query_points(self, model, B=1, method='top', prop_func=None, prop_sigma=0.8, mcavg_beta=0.0, debug=False, verbose=False):
         if method not in SELECTION_METHODS:
             raise ValueError("Selection method %s not valid, must be one of %s" % (method, SELECTION_METHODS))
 
@@ -165,7 +174,7 @@ class ActiveLearner(object):
         if debug:
             self.Cand = Cand
         # Compute acquisition values -- save as object attribute for later plotting
-        self.acq_vals = acquisition_values(self.acquisition, Cand, model)
+        self.acq_vals = acquisition_values(self.acquisition, Cand, model, mcavg_beta=mcavg_beta)
         if len(self.acq_vals.shape) > 1:
             print("WARNING: acq_vals is of shape %s, should be one-dimensional. MIGHT CAUSE PROBLEM" % str(self.acq_vals.shape))
 

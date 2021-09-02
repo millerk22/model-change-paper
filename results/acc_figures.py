@@ -59,7 +59,341 @@ acq_model2label_marker_color = {
 mlflow.set_tracking_uri('../mlruns')
 client = mlflow.tracking.MlflowClient()
 
-save_root = './for-paper/'
+save_root = './for-paper-other/'
+
+# ## Binary Clusters
+
+# +
+exp_name = 'sequential-binary-clusters'
+exp_save_root = os.path.join(save_root, exp_name)
+
+if not os.path.exists(exp_save_root):
+    os.makedirs(exp_save_root)
+
+experiment = client.get_experiment_by_name(exp_name)
+
+query = 'attributes.status = "FINISHED"'
+all_runs = client.search_runs(experiment.experiment_id, filter_string=query)
+print(len(all_runs))
+setup_names = sorted(set(['-'.join(r.data.tags['mlflow.runName'].split('-')[:-1]) for r in all_runs]))
+print(setup_names)
+
+# +
+# Plot figure
+skip = 2
+first = True
+not_plot = ['rand-gr', 'rand-probitnorm', 'uncertainty-gr', 'uncertainty-probitnorm', 'vopt-gr', 'sopt-gr']
+
+plt.figure(figsize=(8,6))
+for setup_name in setup_names:
+    if '-'.join(setup_name.split('-')[:2]) in not_plot:
+        continue
+        
+    runs = [r for r in all_runs if setup_name in r.data.tags['mlflow.runName']]
+    acq_model = '-'.join(runs[0].data.tags['mlflow.runName'].split('-')[:2])
+    lbl, mrkr, clr = acq_model2label_marker_color[acq_model]
+    
+    al_iters = int(runs[0].data.params['al_iters'])
+    ACC = np.zeros(al_iters + 1)
+    
+    print(len(runs), setup_name)
+    for r in runs:
+        acc = np.array([r.data.metrics['init_acc']])
+        iter_stats = load_uri(os.path.join(r.info.artifact_uri, 'iter_stats.npz'))
+        ACC += np.concatenate((acc, iter_stats['iter_acc']))
+    
+    ACC /=  float(len(runs))
+    
+    if first:
+        num_init_labeled = len(load_uri(os.path.join(r.info.artifact_uri, 'init_labeled.npy')))
+        B = int(runs[0].data.params['B'])
+        dom = [num_init_labeled + B*i for i in range(al_iters+1)]
+        first = False
+    
+    plt.scatter(dom[:50:skip], ACC[:50:skip], marker=mrkr, label=lbl, s=50, c=clr)
+    plt.plot(dom[:50:skip], ACC[:50:skip], linewidth=0.9, c=clr)
+    
+plt.legend()
+plt.xlabel("Number of labeled points, $|\mathcal{L}|$")
+plt.ylabel("Accuracy")
+plt.tight_layout()
+# plt.savefig('{}/acc.pdf'.format(exp_save_root))
+plt.show()
+# -
+
+checkdata = np.load('../data/binary_clusters2/X_labels.npz', allow_pickle=True)
+X = checkdata['X']
+labels = checkdata['labels']
+clrs = np.array(X.shape[0]*['r'])
+clrs[labels == 0] = 'b'
+for r in all_runs:
+    print(r.data.tags['mlflow.runName'])
+    if r.data.tags['mlflow.runName'][-1] != '0':
+        continue
+    iter_stats = load_uri(os.path.join(r.info.artifact_uri, 'iter_stats.npz'))
+    choices = iter_stats['al_choices'].flatten()
+    init_labeled = load_uri(os.path.join(r.info.artifact_uri, 'init_labeled.npy'))
+    choices = np.concatenate((init_labeled, choices))[:350]
+    if np.max(choices) > 1999:
+        print('found checker run with more than 2000 nodes')
+        continue
+    plt.figure(figsize=(5,5))
+    plt.scatter(X[:,0], X[:,1], c=clrs)
+    plt.scatter(X[choices[:50],0], X[choices[:50],1], marker='*', s=90, c='gold', linewidths=0.6, edgecolors='k')
+    #plt.title(r.data.tags['mlflow.runName'])
+    plt.xticks([], [])
+    plt.yticks([], [])
+    plt.savefig('{}/{}.pdf'.format(exp_save_root, r.data.tags['mlflow.runName']))
+    plt.show()
+
+# +
+# Redo of experiment -- changed tau = 0.001 and gamma = 0.5
+exp_name = 'sequential-binary-clusters3'
+exp_save_root = os.path.join(save_root, exp_name)
+
+if not os.path.exists(exp_save_root):
+    os.makedirs(exp_save_root)
+
+experiment = client.get_experiment_by_name(exp_name)
+
+query = 'attributes.status = "FINISHED"'
+all_runs = client.search_runs(experiment.experiment_id, filter_string=query)
+print(len(all_runs))
+setup_names = sorted(set(['-'.join(r.data.tags['mlflow.runName'].split('-')[:-1]) for r in all_runs]))
+print(setup_names)
+
+# +
+# Plot figure
+skip = 2
+first = True
+not_plot = ['rand-gr', 'rand-probitnorm', 'uncertainty-gr', 'uncertainty-probitnorm', 'vopt-gr', 'sopt-gr']
+
+plt.figure(figsize=(8,6))
+for setup_name in setup_names:
+    if '-'.join(setup_name.split('-')[:2]) in not_plot:
+        continue
+        
+    runs = [r for r in all_runs if setup_name in r.data.tags['mlflow.runName']]
+    acq_model = '-'.join(runs[0].data.tags['mlflow.runName'].split('-')[:2])
+    lbl, mrkr, clr = acq_model2label_marker_color[acq_model]
+    
+    al_iters = int(runs[0].data.params['al_iters'])
+    ACC = np.zeros(al_iters + 1)
+    
+    print(len(runs), setup_name)
+    for r in runs:
+        acc = np.array([r.data.metrics['init_acc']])
+        iter_stats = load_uri(os.path.join(r.info.artifact_uri, 'iter_stats.npz'))
+        ACC += np.concatenate((acc, iter_stats['iter_acc']))
+    
+    ACC /=  float(len(runs))
+    
+    if first:
+        num_init_labeled = len(load_uri(os.path.join(r.info.artifact_uri, 'init_labeled.npy')))
+        B = int(runs[0].data.params['B'])
+        dom = [num_init_labeled + B*i for i in range(al_iters+1)]
+        first = False
+    
+    plt.scatter(dom[:50:skip], ACC[:50:skip], marker=mrkr, label=lbl, s=50, c=clr)
+    plt.plot(dom[:50:skip], ACC[:50:skip], linewidth=0.9, c=clr)
+    
+plt.legend()
+plt.xlabel("Number of labeled points, $|\mathcal{L}|$")
+plt.ylabel("Accuracy")
+plt.tight_layout()
+plt.savefig('{}/acc.pdf'.format(exp_save_root))
+plt.show()
+# -
+
+checkdata = np.load('../data/binary_clusters2/X_labels.npz', allow_pickle=True)
+X = checkdata['X']
+labels = checkdata['labels']
+clrs = np.array(X.shape[0]*['r'])
+clrs[labels == 0] = 'b'
+for r in all_runs:
+    print(r.data.tags['mlflow.runName'])
+    if r.data.tags['mlflow.runName'][-1] != '0':
+        continue
+    iter_stats = load_uri(os.path.join(r.info.artifact_uri, 'iter_stats.npz'))
+    choices = iter_stats['al_choices'].flatten()
+    init_labeled = load_uri(os.path.join(r.info.artifact_uri, 'init_labeled.npy'))
+    choices = np.concatenate((init_labeled, choices))[:350]
+    if np.max(choices) > 1999:
+        print('found checker run with more than 2000 nodes')
+        continue
+    plt.figure(figsize=(5,5))
+    plt.scatter(X[:,0], X[:,1], c=clrs)
+    plt.scatter(X[choices[:50],0], X[choices[:50],1], marker='*', s=90, c='gold', linewidths=0.6, edgecolors='k')
+    #plt.title(r.data.tags['mlflow.runName'])
+    plt.xticks([], [])
+    plt.yticks([], [])
+    plt.savefig('{}/{}.pdf'.format(exp_save_root, r.data.tags['mlflow.runName']))
+    plt.show()
+
+# # Binary Clusters 3 - Sequential
+
+# +
+# Redo of experiment -- changed tau = 0.001 and gamma = 0.5
+exp_name = 'binary-clusters3-sequential'
+exp_save_root = os.path.join(save_root, exp_name)
+
+if not os.path.exists(exp_save_root):
+    os.makedirs(exp_save_root)
+
+experiment = client.get_experiment_by_name(exp_name)
+
+query = 'attributes.status = "FINISHED"'
+all_runs = client.search_runs(experiment.experiment_id, filter_string=query)
+print(len(all_runs))
+setup_names = sorted(set(['-'.join(r.data.tags['mlflow.runName'].split('-')[:-1]) for r in all_runs]))
+print(setup_names)
+
+# +
+# Plot figure
+skip = 2
+first = True
+not_plot = ['rand-gr', 'rand-probitnorm', 'uncertainty-gr', 'uncertainty-probitnorm', 'vopt-gr', 'sopt-gr']
+
+plt.figure(figsize=(8,6))
+for setup_name in setup_names:
+    if '-'.join(setup_name.split('-')[:2]) in not_plot:
+        continue
+        
+    runs = [r for r in all_runs if setup_name in r.data.tags['mlflow.runName']]
+    acq_model = '-'.join(runs[0].data.tags['mlflow.runName'].split('-')[:2])
+    lbl, mrkr, clr = acq_model2label_marker_color[acq_model]
+    
+    al_iters = int(runs[0].data.params['al_iters'])
+    ACC = np.zeros(al_iters + 1)
+    
+    print(len(runs), setup_name)
+    for r in runs:
+        acc = np.array([r.data.metrics['init_acc']])
+        iter_stats = load_uri(os.path.join(r.info.artifact_uri, 'iter_stats.npz'))
+        ACC += np.concatenate((acc, iter_stats['iter_acc']))
+    
+    ACC /=  float(len(runs))
+    
+    if first:
+        num_init_labeled = len(load_uri(os.path.join(r.info.artifact_uri, 'init_labeled.npy')))
+        B = int(runs[0].data.params['B'])
+        dom = [num_init_labeled + B*i for i in range(al_iters+1)]
+        first = False
+    
+    plt.scatter(dom[:100:skip], ACC[:100:skip], marker=mrkr, label=lbl, s=50, c=clr)
+    plt.plot(dom[:100:skip], ACC[:100:skip], linewidth=0.9, c=clr)
+    
+plt.legend()
+plt.xlabel("Number of labeled points, $|\mathcal{L}|$")
+plt.ylabel("Accuracy")
+plt.tight_layout()
+plt.savefig('{}/acc.pdf'.format(exp_save_root))
+plt.show()
+# -
+
+checkdata = np.load('../data/binary_clusters3/X_labels.npz', allow_pickle=True)
+X = checkdata['X']
+labels = checkdata['labels']
+clrs = np.array(X.shape[0]*['r'])
+clrs[labels == 0] = 'b'
+for r in all_runs:
+    print(r.data.tags['mlflow.runName'])
+    if r.data.tags['mlflow.runName'][-1] != '0':
+        continue
+    iter_stats = load_uri(os.path.join(r.info.artifact_uri, 'iter_stats.npz'))
+    choices = iter_stats['al_choices'].flatten()
+    init_labeled = load_uri(os.path.join(r.info.artifact_uri, 'init_labeled.npy'))
+    choices = np.concatenate((init_labeled, choices))[:350]
+    if np.max(choices) > 1999:
+        print('found checker run with more than 2000 nodes')
+        continue
+    plt.figure(figsize=(5,5))
+    plt.scatter(X[:,0], X[:,1], c=clrs)
+    plt.scatter(X[choices[:50],0], X[choices[:50],1], marker='*', s=90, c='gold', linewidths=0.6, edgecolors='k')
+    #plt.title(r.data.tags['mlflow.runName'])
+    plt.xticks([], [])
+    plt.yticks([], [])
+    plt.savefig('{}/{}.pdf'.format(exp_save_root, r.data.tags['mlflow.runName']))
+    plt.show()
+
+plt.figure(figsize=(5,5))
+plt.scatter(X[:,0], X[:,1], c=clrs)
+plt.xticks([], [])
+plt.yticks([], [])
+plt.savefig('{}/{}.pdf'.format(exp_save_root, 'bc-gt'))
+plt.show()
+
+# # Binary Clusters3 - Batch
+
+# +
+# Redo of experiment -- changed tau = 0.001 and gamma = 0.5
+exp_name = 'binary-clusters3-batch'
+exp_save_root = os.path.join(save_root, exp_name)
+
+if not os.path.exists(exp_save_root):
+    os.makedirs(exp_save_root)
+
+experiment = client.get_experiment_by_name(exp_name)
+
+query = 'attributes.status = "FINISHED"'
+all_runs = client.search_runs(experiment.experiment_id, filter_string=query)
+print(len(all_runs))
+setup_names = sorted(set(['-'.join(r.data.tags['mlflow.runName'].split('-')[:-1]) for r in all_runs]))
+print(setup_names)
+
+# +
+# Plot figure
+skip = 1
+first = True
+not_plot = ['rand-gr', 'rand-probitnorm', 'uncertainty-gr', 'uncertainty-probitnorm', 'vopt-gr', 'sopt-gr']
+
+plt.figure(figsize=(8,6))
+for setup_name in setup_names:
+    if '-'.join(setup_name.split('-')[:2]) in not_plot:
+        continue
+        
+    runs = [r for r in all_runs if setup_name in r.data.tags['mlflow.runName']]
+    acq_model = '-'.join(runs[0].data.tags['mlflow.runName'].split('-')[:2])
+    lbl, mrkr, clr = acq_model2label_marker_color[acq_model]
+    
+    al_iters = int(runs[0].data.params['al_iters'])
+    ACC = np.zeros(al_iters + 1)
+    
+    print(len(runs), setup_name)
+    for r in runs:
+        acc = np.array([r.data.metrics['init_acc']])
+        iter_stats = load_uri(os.path.join(r.info.artifact_uri, 'iter_stats.npz'))
+        ACC += np.concatenate((acc, iter_stats['iter_acc']))
+    
+    ACC /=  float(len(runs))
+    
+    if first:
+        num_init_labeled = len(load_uri(os.path.join(r.info.artifact_uri, 'init_labeled.npy')))
+        B = int(runs[0].data.params['B'])
+        dom = [num_init_labeled + B*i for i in range(al_iters+1)]
+        first = False
+    
+    plt.scatter(dom[:20:skip], ACC[:20:skip], marker=mrkr, label=lbl, s=50, c=clr)
+    plt.plot(dom[:20:skip], ACC[:20:skip], linewidth=0.9, c=clr)
+    
+plt.legend()
+plt.xlabel("Number of labeled points, $|\mathcal{L}|$")
+plt.ylabel("Accuracy")
+plt.tight_layout()
+plt.savefig('{}/acc.pdf'.format(exp_save_root))
+plt.show()
+# -
+
+plt.scatter(X[:,0], X[:,1], c=labels)
+plt.show()
+
+checkdata2 = np.load('../data/binary_clusters_check/X_labels.npz', allow_pickle=True)
+X2 = checkdata2['X']
+labels2 = checkdata2['labels']
+
+print(np.allclose(X2, X))
+
+
 
 # ## Checker 2
 

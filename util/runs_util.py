@@ -2,6 +2,7 @@ import numpy as np
 import time
 import sys
 from sklearn.preprocessing import OneHotEncoder
+from sklearn.datasets import make_moons, make_blobs
 
 from .activelearner import *
 from .gbssl import *
@@ -15,7 +16,7 @@ import mlflow
 BMODELNAMES = ['gr', 'log', 'probitnorm']
 MMODELNAMES = ['mgr', 'ce']
 OTHERMODELNAMES = ['rkhs', 'hf']
-ACQS = ['mc', 'uncertainty', 'rand', 'vopt', 'sopt', 'mbr', 'mcgreedy']
+ACQS = ['mc', 'uncertainty', 'rand', 'vopt', 'sopt', 'mbr', 'mcgreedy', 'mcavg', 'mcavgf', 'mcf']
 
 def create_checkerboard2(N):
     X = np.random.rand(N,2)
@@ -38,6 +39,25 @@ def create_checkerboard2(N):
 
         labels.append((i+j) % 2)
     return X, np.array(labels)
+
+
+def create_binary_clusters():
+    np.random.seed(4)
+    Xm, labelsm = make_moons(200, shuffle=False, noise=0.12)
+    X1, labels1 = make_blobs([50,60, 40, 30, 40], 2, shuffle=False, centers=[[1.6,-1.3],[1.3,1.7], [0.5, 2.4], [0.2,-1.], [-1.7,2.2]], cluster_std=[.26, .23, .23, .26, .23])
+    labels1 = labels1 % 2
+    X2 = np.random.randn(100,2) @ np.array([[.4, 0.],[0.,.3]]) + np.array([-1.5,-.8])
+    X3 = np.random.randn(70,2) @ np.array([[.4, 0.],[0.,.3]]) + np.array([2.5,2.8])
+    x11, x12 = np.array([-2., 0.8])[np.newaxis, :], np.array([-.2,2.])[np.newaxis, :]
+    l1 = (x11 + np.linspace(0,1, 80)[:, np.newaxis] @ (x12 - x11))  + np.random.randn(80, 2)*0.18
+    x21, x22 = np.array([2.5, -1.5])[np.newaxis, :], np.array([2.5, 2.])[np.newaxis, :]
+    l2 = (x21 + np.linspace(0,1, 90)[:, np.newaxis] @ (x22 - x21))  + np.random.randn(90, 2)*0.2
+
+
+    X = np.concatenate((Xm, X1, X2, X3, l1, l2))
+    labels = np.concatenate((labelsm, labels1, np.zeros(100), np.ones(70), np.ones(80), np.zeros(90)))
+
+    return X, labels
 
 
 def create_checkerboard3(N):
@@ -248,7 +268,7 @@ def run_rkhs_hf(oracle, init_labeled, num_al_iters, B_per_al_iter, modelname='rk
 
 def run_multi(w, v, tau, gamma, oracle, init_labeled, num_al_iters, B_per_al_iter,
                          modelname='mgr', acq='mc', cand='rand', select_method='top', full=False,
-                          verbose=False):
+                         verbose=False):
     '''
     Inputs:
       w = eigenvalue numpy array
@@ -315,13 +335,24 @@ def run_multi(w, v, tau, gamma, oracle, init_labeled, num_al_iters, B_per_al_ite
     iter_acc = []
     iter_time = []
     al_choices = []
+    beta = 0.
     for al_iter in range(num_al_iters):
-        if verbose or (al_iter % 10 == 0):
+        if verbose or (al_iter % 1 == 0):
             print("AL Iteration %d, acc=%1.6f" % (al_iter + 1, acc))
+            if acq in ['mcavg', 'mcavgf']:
+                #beta = 1./(1. + al_iter // 10)
+                beta = (1. - (al_iter/float(num_al_iters)))
+                if beta < 0:
+                    beta = 0.0
+                # if al_iter < 8:
+                #     beta = 1.0
+                # else:
+                #     beta = 0.0
+                print("\tbeta = {:.3f}".format(beta))
         # select query points via active learning
         tic = time.perf_counter()
         Q = AL.select_query_points(
-            model, B_per_al_iter, method=select_method, verbose=verbose)
+            model, B_per_al_iter, method=select_method, verbose=verbose, mcavg_beta=beta)
         toc = time.perf_counter()
 
         # query oracle
