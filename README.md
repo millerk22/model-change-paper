@@ -15,9 +15,8 @@ To run tests in this framework, run scripts ``bin_run.py`` or ``multi_run.py`` s
 ### Simple Self-Contained Test
 
 Can simply run test on the synthetic dataset "Binary Clusters" presented in the paper:
-``` python binary_clusters_run.py --al-iters 100 --B 1 # run sequential active learning on binary clusters data for 100 active learning iterations
-python binary_clusters_run.py --al-iters 20 --B 5 # run batch activate learning on binary clusters data for 20 active learning iterations
-```
+``` python binary_clusters_run.py --al-iters 100 --B 1 # run sequential active learning on binary clusters data for 100 active learning iterations```
+```python binary_clusters_run.py --al-iters 20 --B 5 # run batch activate learning on binary clusters data for 20 active learning iterations```
 
 ## Results in Paper
 Example plots from code in ``results/acc_figures.py``
