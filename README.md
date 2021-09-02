@@ -12,6 +12,9 @@ To run tests in this framework, run scripts ``bin_run.py`` or ``multi_run.py`` s
   * __multiclass models__ : ``gr``(Gaussian Regression), ``ce`` (Cross-Entropy)
   * Separate __acquisition function__ and __model__ with double-dash: e.g. ``mc--gr`` --> Model Change acquisition function in Gaussian Regression Model.
 
+### Package Requirements
+This repo requires the Python packages: ``sklearn, mlflow, numpy, scipy``.
+
 ### Simple Self-Contained Test
 
 Can simply run test on the synthetic dataset "Binary Clusters" presented in the paper:
