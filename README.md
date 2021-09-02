@@ -19,4 +19,4 @@ Example plots from code in ``results/acc_figures.py``
 ### Multiclass Gaussian Regression
 MNIST           |  Salinas A       | Urban 
 :-------------------------:|:-------------------------:|:-------------------------:
-![](results/for-paper/MNIST/acc-mgr.pdf) |  ![](results/for-paper/salinas/acc-mgr.pdf) | ![](results/for-paper/urban/acc-mgr.pdf)
+![](results/gh-pics/acc-mgr-mnist.png) |  ![](results/gh-pics/acc-mgr-salinas.png) | ![](results/gh-pics/acc-mgr-urban.png)
